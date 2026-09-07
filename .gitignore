@@ -1,0 +1,44 @@
+# data (CERT r4.2 is licence-restricted; never commit it)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+*.parquet
+*.csv.gz
+
+# model artefacts
+models/*
+!models/.gitkeep
+*.pt
+*.pkl
+*.joblib
+
+# secrets and keys
+.env
+*.pem
+keys/
+
+# off-chain evidence store and local ledger spool
+evidence/
+*.jsonl
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# fabric
+chaincode/**/vendor/
+fabric-samples/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
