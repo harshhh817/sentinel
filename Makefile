@@ -7,7 +7,7 @@ BIN         := $(VENV)/bin
 UV          := $(shell command -v uv 2> /dev/null)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup test lint train eval ablation latency tamper demo serve clean
+.PHONY: help setup test lint sample dataset train eval ablation latency tamper demo serve clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -29,6 +29,12 @@ test: ## Run the test suite
 
 lint: ## Lint and format-check
 	$(BIN)/ruff check .
+
+sample: ## Validate the pipeline on a 1-month sample -> data/processed/sample/
+	$(BIN)/python scripts/build_dataset.py --root data/raw/r4.2 --months 1
+
+dataset: ## Build the full 17-month train/val/test splits -> data/processed/
+	$(BIN)/python scripts/build_dataset.py --root data/raw/r4.2
 
 train: ## Train autoencoder + isolation forest over 5 seeds -> models/
 	$(BIN)/python scripts/train.py

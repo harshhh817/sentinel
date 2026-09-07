@@ -29,7 +29,7 @@ request ─▶ PEP (auth + device posture)
 | Module | Scope | State |
 |---|---|---|
 | 0 | Scaffold, dependencies, Makefile | **done** |
-| 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | not started |
+| 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | **code done, unrun** |
 | 2 | Risk engine, trust algorithm, Tables V and VI | not started |
 | 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | not started |
 | 4 | Fabric chaincode, committer, tamper experiment, Table VII | not started |
@@ -70,8 +70,29 @@ data/              raw CERT corpus (gitignored) and processed parquet splits
 
 The CERT r4.2 insider-threat corpus is licence-restricted and is **not** committed. Place the
 extracted CSVs (`logon.csv`, `file.csv`, `device.csv`, `http.csv`, `LDAP/`, `answers/`) under
-`data/raw/` and run `scripts/build_dataset.py`. The split is by time — first 10 months train
-(benign only), next 2 validation, last 5 test — never random.
+`data/raw/r4.2/`, then:
+
+```bash
+make sample     # 1-month validation pass -> data/processed/sample/
+make dataset    # full 17 months -> data/processed/{train,val,test}.parquet
+```
+
+The split is by time — first 10 months train (benign only), next 2 validation, last 5 test —
+never random. The mapper streams every file, so `http.csv` (~10 GB) is never loaded into memory;
+measured peak RSS is flat at ~135 MB regardless of corpus size.
+
+Budget roughly **2 GB** for `data/processed/` on top of the raw corpus (measured at 59 bytes per
+event over 34 features plus metadata).
+
+Two assumptions in the mapping are worth checking against the real corpus before trusting
+downstream numbers, both flagged in the source:
+
+- r4.2's `file.csv` has no `activity` column, so the `s3:GetObject` / `s3:PutObject` split is a
+  documented rule (removable-media paths are reads, everything else writes) rather than something
+  the corpus states — see `ztb/features/cert_mapper.py`.
+- CERT carries no ASN, geolocation, device fingerprint or MFA data, so the five network-and-device
+  features are synthesised deterministically from the originating host — see
+  `ztb/features/builder.py`.
 
 ## Paper → script map
 
