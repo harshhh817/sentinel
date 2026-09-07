@@ -60,10 +60,11 @@ def test_mapping_targets_match_the_paper(corpus):
     actions = {e.source: {ev.action for ev in events if ev.source == e.source} for e in events}
     assert actions["logon"] <= {"sts:AssumeRole", "sts:SessionEnd"}
     assert actions["device"] == {"s3:GetObject"}
-    assert actions["file"] <= {"s3:GetObject", "s3:PutObject"}
+    assert actions["file"] == {"s3:GetObject"}     # r4.2: every file event is a copy to USB
     assert actions["http"] == {"execute-api:Invoke"}
     # Removable-media and external-proxy traffic carries the egress marker.
-    assert all(e.egress for e in events if e.source in {"device", "http"})
+    assert all(e.egress for e in events if e.source in {"device", "file", "http"})
+    assert all(e.bytes_read > 0 for e in events if e.source == "file")
 
 
 def test_timestamps_and_identities_are_preserved(corpus):
@@ -96,9 +97,19 @@ def test_labels_are_read_from_nested_answers_tree(corpus):
     assert "r4.2-2" in labels.scenarios
 
 
+def test_labels_ignore_other_releases_in_the_shared_tree(corpus):
+    """answers/ on KiltHub is shared across r2..r6.2; only the requested release counts."""
+    labels = load_labels(corpus["root"] / "answers", release="4.2")
+    assert "ZZZ9999" not in labels.insiders          # r5.2 insider row filtered out
+    assert "r4.1-1" not in labels.scenarios           # r4.1 scenario file skipped
+    other = load_labels(corpus["root"] / "answers", release="4.1")
+    assert other.insiders == set()
+    assert "r4.1-1" in other.scenarios and len(other) == 1
+
+
 def test_labels_attach_to_the_right_events(corpus):
     labels = load_labels(corpus["root"] / "answers")
-    events = list(stream_events(corpus["root"], labels=set(labels.event_ids)))
+    events = list(stream_events(corpus["root"], labels=set(labels.keys)))
     positives = [e for e in events if e.label == 1]
     assert {e.event_id for e in positives} == corpus["malicious_ids"]
     assert {e.principal for e in positives} == {"CDE1846"}
@@ -344,3 +355,12 @@ def test_streaming_standardiser_rejects_empty_input():
 
     with pytest.raises(ValueError, match="no rows"):
         StandardiserAccumulator().finalize()
+
+
+def test_labels_are_keyed_on_source_and_id(corpus):
+    """r4.2 readme erratum: ids are unique per file, not globally."""
+    labels = load_labels(corpus["root"] / "answers")
+    eid = next(iter(corpus["malicious_ids"]))
+    assert ("file", eid) in labels
+    assert ("http", eid) not in labels        # same id, other file: not malicious
+    assert labels.event_ids == corpus["malicious_ids"]

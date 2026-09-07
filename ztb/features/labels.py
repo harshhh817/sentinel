@@ -7,6 +7,12 @@ than hard-coding one layout, this module walks the tree and extracts CERT event 
 wherever they appear, which is stable across all of them: an event id is a brace-
 delimited token such as ``{H3P8-M1SE43GX-4444RZOJ}``.
 
+The ``answers/`` archive on KiltHub is shared across every CERT release (r2 through
+r6.2) and ``insiders.csv`` lists all of them with a bare ``dataset`` column such as
+``4.2``. :func:`load_labels` therefore takes a ``release`` and only reads scenario
+files whose name starts with ``r<release>-`` and insider rows whose dataset matches,
+so dropping the whole shared tree into ``data/raw/r4.2/answers/`` is safe.
+
 Labels are event-level. The paper reports 3,912 malicious events (0.179 %) in the
 five-month test window; :func:`label_report` exists so that figure can be checked
 against whatever the corpus actually yields rather than assumed.
@@ -30,17 +36,26 @@ LOOSE_ID_RE = re.compile(r"\{[A-Za-z0-9\-]{6,}\}")
 
 @dataclass(frozen=True)
 class LabelSet:
-    """Malicious event ids and the insider principals they belong to."""
+    """Malicious events, keyed on ``(source, event_id)``, and the insiders involved.
 
-    event_ids: frozenset[str]
+    The r4.2 readme's erratum: *"Field Ids are unique within a csv file but may not be
+    globally unique."* An id alone can therefore name a benign row in one file and a
+    malicious row in another, so the key carries the originating file as well.
+    """
+
+    keys: frozenset[tuple[str, str]]      # (source, event_id)
     insiders: frozenset[str]
-    scenarios: dict[str, int]  # scenario name -> number of events contributed
+    scenarios: dict[str, int]              # scenario name -> events contributed
 
-    def __contains__(self, event_id: str) -> bool:
-        return event_id in self.event_ids
+    @property
+    def event_ids(self) -> frozenset[str]:
+        return frozenset(eid for _, eid in self.keys)
+
+    def __contains__(self, key: tuple[str, str]) -> bool:
+        return key in self.keys
 
     def __len__(self) -> int:
-        return len(self.event_ids)
+        return len(self.keys)
 
 
 def _scenario_name(path: Path, root: Path) -> str:
@@ -53,38 +68,60 @@ def _scenario_name(path: Path, root: Path) -> str:
     return "-".join(parts[:2]) if len(parts) >= 2 else stem
 
 
-def load_labels(answers_dir: Path) -> LabelSet:
-    """Walk ``answers/`` and collect every malicious event id it references."""
+def load_labels(answers_dir: Path, release: str = "4.2") -> LabelSet:
+    """Walk ``answers/`` and collect every malicious event id for ``release``."""
     if not answers_dir.is_dir():
         return LabelSet(frozenset(), frozenset(), {})
 
-    event_ids: set[str] = set()
+    keys: set[tuple[str, str]] = set()
     scenarios: dict[str, int] = {}
     insiders: set[str] = set()
+    prefix = f"r{release}-"
 
     for path in sorted(answers_dir.rglob("*.csv")):
         if path.name.lower() == "insiders.csv":
-            insiders |= _read_insiders(path)
+            insiders |= _read_insiders(path, release)
+            continue
+        # The shared tree also holds r4.1-*.csv, r5.2-*/ and so on; skip them.
+        if not path.name.startswith(prefix):
             continue
 
-        text = path.read_text(encoding="utf-8", errors="replace")
-        found = set(EVENT_ID_RE.findall(text))
-        if not found:
-            found = set(LOOSE_ID_RE.findall(text))
+        found = _read_answer_rows(path)
         if not found:
             continue
-
         scenario = _scenario_name(path, answers_dir)
-        new = found - event_ids
-        scenarios[scenario] = scenarios.get(scenario, 0) + len(new)
-        event_ids |= found
+        scenarios[scenario] = scenarios.get(scenario, 0) + len(found - keys)
+        keys |= found
 
-    return LabelSet(frozenset(event_ids), frozenset(insiders), scenarios)
+    return LabelSet(frozenset(keys), frozenset(insiders), scenarios)
 
 
-def _read_insiders(path: Path) -> set[str]:
-    """Pull user ids out of ``insiders.csv`` whatever its column order."""
+def _read_answer_rows(path: Path) -> set[tuple[str, str]]:
+    """Answer rows are headerless: ``source,{id},date,user,pc,...``.
+
+    Falls back to a regex sweep with an empty source if a row is not in that shape,
+    so an unexpected layout still yields ids rather than silently nothing.
+    """
+    found: set[tuple[str, str]] = set()
+    with path.open(newline="", encoding="utf-8", errors="replace") as fh:
+        for row in csv.reader(fh):
+            if len(row) >= 2 and EVENT_ID_RE.fullmatch(row[1].strip()):
+                found.add((row[0].strip().lower(), row[1].strip()))
+    if not found:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        ids = EVENT_ID_RE.findall(text) or LOOSE_ID_RE.findall(text)
+        found = {("", eid) for eid in ids}
+    return found
+
+
+def _read_insiders(path: Path, release: str) -> set[str]:
+    """Pull user ids for one release out of ``insiders.csv``.
+
+    The real file's ``dataset`` column is bare (``4.2``); older mirrors used ``r4.2``.
+    Both are accepted. A file with no ``dataset`` column is taken to be single-release.
+    """
     users: set[str] = set()
+    accepted = {release, f"r{release}"}
     with path.open(newline="", encoding="utf-8", errors="replace") as fh:
         reader = csv.reader(fh)
         header = next(reader, None)
@@ -92,12 +129,16 @@ def _read_insiders(path: Path) -> set[str]:
             return users
         cols = [h.strip().lower() for h in header]
         try:
-            idx = next(i for i, c in enumerate(cols) if c in {"user", "user_id", "userid"})
+            user_idx = next(i for i, c in enumerate(cols) if c in {"user", "user_id", "userid"})
         except StopIteration:
             return users
+        dataset_idx = cols.index("dataset") if "dataset" in cols else None
         for row in reader:
-            if len(row) > idx and row[idx].strip():
-                users.add(row[idx].strip())
+            if len(row) <= user_idx or not row[user_idx].strip():
+                continue
+            if dataset_idx is not None and row[dataset_idx].strip() not in accepted:
+                continue
+            users.add(row[user_idx].strip())
     return users
 
 
@@ -116,5 +157,5 @@ def label_report(labels: LabelSet, total_events: int, positives: int) -> dict[st
 def apply_labels(events: Iterable, labels: LabelSet):
     """Set ``label`` on a stream of :class:`~ztb.features.schema.CloudEvent`."""
     for event in events:
-        event.label = 1 if event.event_id in labels.event_ids else 0
+        event.label = 1 if (event.source, event.event_id) in labels else 0
         yield event

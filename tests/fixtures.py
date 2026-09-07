@@ -62,9 +62,10 @@ def write_corpus(
             elif kind == 1:
                 rows["device"].append([eid, stamp, user, pc, "Connect"])
             elif kind == 2:
-                # Alternate removable / local so the read-write ratio is not degenerate.
-                fname = "R:\\payroll.xlsx" if slot % 8 == 2 else "C:\\work\\notes.doc"
-                rows["file"].append([eid, stamp, user, pc, fname, "file-content-" * 3])
+                # Real r4.2 filenames are bare and content holds the file's magic bytes.
+                fname = "EYPC9Y08.doc" if slot % 8 == 2 else "N3LTSU3O.pdf"
+                magic = "D0-CF-11-E0-A1-B1-1A-E1" if fname.endswith(".doc") else "25-50-44-46-2D"
+                rows["file"].append([eid, stamp, user, pc, fname, magic + " lorem ipsum"])
             else:
                 rows["http"].append([eid, stamp, user, pc,
                                      "http://wikileaks.org/leak", "page-content-" * 5])
@@ -103,14 +104,22 @@ def write_corpus(
     answers = root / "answers" / "r4.2-2"
     answers.mkdir(parents=True, exist_ok=True)
     with (answers / "r4.2-2-CDE1846.csv").open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.writer(fh)
-        writer.writerow(["id", "date", "user", "pc", "activity"])
+        writer = csv.writer(fh)  # real answer files carry no header row
         for eid in malicious_ids:
-            writer.writerow([eid, "01/01/2010 00:00:00", "CDE1846", "PC-0001", "scenario"])
+            writer.writerow(["file", eid, "01/01/2010 00:00:00", "CDE1846", "PC-0001", "x"])
+    # insiders.csv in the real release covers every dataset with a bare "4.2" column.
+    # A decoy r5.2 row and a decoy r4.1 scenario file prove the release filter works.
     with (root / "answers" / "insiders.csv").open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
-        writer.writerow(["dataset", "scenario", "user", "start", "end"])
-        writer.writerow(["r4.2", "2", "CDE1846", "01/01/2010", "12/31/2010"])
+        writer.writerow(["dataset", "scenario", "details", "user", "start", "end"])
+        writer.writerow(["4.2", "2", "r4.2-2-CDE1846.csv", "CDE1846",
+                         "01/01/2010 00:00:00", "12/31/2010 00:00:00"])
+        writer.writerow(["5.2", "1", "r5.2-1-ZZZ9999.csv", "ZZZ9999",
+                         "01/01/2010 00:00:00", "12/31/2010 00:00:00"])
+    with (root / "answers" / "r4.1-1.csv").open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["logon", _event_id(rng), "01/01/2010 00:00:00", "ZZZ9999",
+                         "PC-0000", "Logon"])
 
     return {
         "root": root,

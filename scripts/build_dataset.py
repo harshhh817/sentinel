@@ -31,7 +31,7 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import DATA_PROCESSED, DATA_RAW, MODELS, SPLIT_MONTHS  # noqa: E402
+from ztb.config import DATA_PROCESSED, DATA_RAW, MODELS, RESULTS, SPLIT_MONTHS  # noqa: E402
 from ztb.features.baseline import BaselineStore  # noqa: E402
 from ztb.features.builder import (  # noqa: E402
     FEATURE_NAMES,
@@ -184,7 +184,7 @@ def build(
     by_source: dict[str, int] = {}
     by_action: dict[str, int] = {}
 
-    for event in stream_events(root, until=until, labels=set(labels.event_ids)):
+    for event in stream_events(root, until=until, labels=set(labels.keys)):
         profile = store.get(event.principal)
         vector = build_vector(event, profile, org.get(event.principal))
         observe_event(event, profile)
@@ -256,7 +256,13 @@ def build(
         "standardiser_fitted_on": "train" if standardiser else None,
         "standardiser_rows": len(train_stats),
     }
-    (out_dir / "report.json").write_text(json.dumps(report, indent=2, default=str))
+    payload = json.dumps(report, indent=2, default=str)
+    (out_dir / "report.json").write_text(payload)
+    # data/processed lives on an external disk and is gitignored; results/ is the
+    # committed record, and CLAUDE.md requires every number there to come from a script.
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    name = "module1_sample_report.json" if months else "module1_dataset_report.json"
+    (RESULTS / name).write_text(payload)
     return report
 
 

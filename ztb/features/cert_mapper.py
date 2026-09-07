@@ -13,21 +13,24 @@ CERT event                       cloud action
 logon.csv  Logon                 ``sts:AssumeRole``
 logon.csv  Logoff                ``sts:SessionEnd``
 device.csv Connect/Disconnect    ``s3:GetObject`` with an egress marker
-file.csv   removable path (R:)   ``s3:GetObject`` with an egress marker
-file.csv   other paths           ``s3:PutObject``
+file.csv   (every row)           ``s3:GetObject`` with an egress marker
 http.csv                         ``execute-api:Invoke`` (external proxy)
 ===============================  ==========================================
 
 Buckets are assigned from the principal's organisational unit, so the resource string
 carries the same org structure the corpus does.
 
-.. warning::
-   r4.2's ``file.csv`` has no ``activity`` column (r5.x and r6.x do), so the
-   read/write split above is a **documented assumption**, not something the corpus
-   states: paths on removable media are treated as reads leaving the organisation and
-   all other file touches as writes to the principal's own bucket. Validate this
-   against the real corpus before trusting the read/write-ratio feature; it is
-   isolated in :func:`_map_file` so it is a one-function change.
+.. note::
+   **Verified against the real r4.2 corpus.** ``file.csv`` has no ``activity``
+   column, filenames are bare (``EYPC9Y08.doc``; 0 of 445,581 rows carry a drive
+   letter), the ``content`` column holds the file's magic bytes, and only 264 of the
+   ~1,000 users appear in it. That is the r4.2 semantics: ``file.csv`` records
+   files copied **to removable media**, so every row is a read leaving the
+   organisation and maps to ``s3:GetObject`` with the egress marker, exactly as the
+   paper maps removable-device events. Consequently r4.2 offers no source for
+   ``s3:PutObject``; the paper's Get/Put split needs the ``activity`` column of
+   r5.x+. The read/write-ratio feature is therefore weak on this corpus (only
+   ``sts:SessionEnd`` counts as a write) and is reported as such.
 """
 
 from __future__ import annotations
@@ -52,7 +55,6 @@ from ztb.features.schema import (
 csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
 ACCOUNT = "000000000000"          # single-tenant prototype; the paper uses one account
-REMOVABLE_PREFIXES = ("R:", "r:")  # CERT's removable-media drive letter
 
 # Events arriving out of order by more than this are dropped from the merge's
 # monotonicity guarantee. CERT files are generated chronologically; the buffer only
@@ -154,22 +156,24 @@ def _map_device(row: dict[str, str], ts: datetime, bucket: str) -> CloudEvent:
 
 
 def _map_file(row: dict[str, str], ts: datetime, bucket: str) -> CloudEvent:
-    """See the module-level warning: r4.2 has no activity column, so this is a rule."""
+    """A file copied to removable media: a read that leaves the organisation.
+
+    See the module note: on r4.2 every ``file.csv`` row is such a copy.
+    """
     filename = row["filename"].strip()
-    to_removable = filename.startswith(REMOVABLE_PREFIXES)
     key = filename.replace("\\", "/").lstrip("/")
     return CloudEvent(
         event_id=row["id"],
         ts=ts,
         principal=row["user"],
-        action="s3:GetObject" if to_removable else "s3:PutObject",
-        resource=_arn(bucket, key),
+        action="s3:GetObject",
+        resource=_arn(bucket, f"removable/{key}"),
         source="file",
         pc=row["pc"],
-        egress=to_removable,
-        # CERT records file content, not a transfer size; its length is the only
-        # volume proxy the corpus offers.
-        bytes_read=len(row.get("content", "")) if to_removable else 0,
+        egress=True,
+        # CERT records the file's leading bytes, not a transfer size; the content
+        # length is the only volume proxy the corpus offers.
+        bytes_read=len(row.get("content", "")),
         extra={"filename": filename},
     )
 
@@ -247,13 +251,13 @@ def stream_events(
     *,
     sources: tuple[str, ...] = MAPPED_SOURCES,
     until: datetime | None = None,
-    labels: set[str] | None = None,
+    labels: set[tuple[str, str]] | None = None,
 ) -> Iterator[CloudEvent]:
     """Merge every CERT source into one stream ordered by timestamp.
 
     Uses :func:`heapq.merge`, so memory is O(number of sources) regardless of how large
-    the underlying files are. ``labels`` is the set of malicious event ids from
-    ``answers/``; when supplied, ``CloudEvent.label`` is set as events pass through.
+    the underlying files are. ``labels`` is the set of malicious ``(source, event_id)``
+    keys from ``answers/``; when supplied, ``CloudEvent.label`` is set as events pass.
     """
     org = load_org_units(root / "LDAP")
     streams = []
@@ -274,5 +278,5 @@ def stream_events(
         yield from merged
     else:
         for event in merged:
-            event.label = 1 if event.event_id in labels else 0
+            event.label = 1 if (event.source, event.event_id) in labels else 0
             yield event

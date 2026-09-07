@@ -1,8 +1,7 @@
 # data (CERT r4.2 is licence-restricted; never commit it)
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
+# data/raw is a machine-specific symlink to the external disk; never commit it
+data/raw
+data/processed
 *.parquet
 *.csv.gz
 

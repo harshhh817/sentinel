@@ -29,7 +29,7 @@ request ─▶ PEP (auth + device posture)
 | Module | Scope | State |
 |---|---|---|
 | 0 | Scaffold, dependencies, Makefile | **done** |
-| 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | **code done, unrun** |
+| 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | **verified on 1-month sample; full run pending** |
 | 2 | Risk engine, trust algorithm, Tables V and VI | not started |
 | 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | not started |
 | 4 | Fabric chaincode, committer, tamper experiment, Table VII | not started |
@@ -84,12 +84,16 @@ measured peak RSS is flat at ~135 MB regardless of corpus size.
 Budget roughly **2 GB** for `data/processed/` on top of the raw corpus (measured at 59 bytes per
 event over 34 features plus metadata).
 
-Two assumptions in the mapping are worth checking against the real corpus before trusting
-downstream numbers, both flagged in the source:
+`data/raw` is a symlink to an external disk (the corpus is ~20 GB extracted) and is gitignored;
+`answers/` ships as a separate archive on KiltHub and must sit at `data/raw/r4.2/answers/`.
 
-- r4.2's `file.csv` has no `activity` column, so the `s3:GetObject` / `s3:PutObject` split is a
-  documented rule (removable-media paths are reads, everything else writes) rather than something
-  the corpus states — see `ztb/features/cert_mapper.py`.
+Two points about the mapping, both verified against the real r4.2 files and documented in the
+source:
+
+- r4.2's `file.csv` has no `activity` column and its filenames are bare (0 of 445,581 rows carry
+  a drive letter); every row is a file copied to removable media, so all file events map to
+  `s3:GetObject` with the egress marker. r4.2 therefore has no source for `s3:PutObject`; the
+  paper's Get/Put split needs the `activity` column of r5.x+ — see `ztb/features/cert_mapper.py`.
 - CERT carries no ASN, geolocation, device fingerprint or MFA data, so the five network-and-device
   features are synthesised deterministically from the originating host — see
   `ztb/features/builder.py`.
