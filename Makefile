@@ -6,6 +6,12 @@ VENV        ?= .venv
 BIN         := $(VENV)/bin
 UV          := $(shell command -v uv 2> /dev/null)
 
+# Long runs must survive the laptop's idle-sleep (this Mac sleeps after 1 min;
+# sleep cuts USB power and ejects the external data disk). caffeinate -dims
+# holds display/idle/disk/system sleep for the duration of the wrapped command.
+CAFF        := $(shell command -v caffeinate 2> /dev/null)
+KEEPAWAKE   := $(if $(CAFF),caffeinate -dims,)
+
 .DEFAULT_GOAL := help
 .PHONY: help setup test lint sample dataset train eval ablation latency tamper demo serve clean
 
@@ -31,26 +37,26 @@ lint: ## Lint and format-check
 	$(BIN)/ruff check .
 
 sample: ## Validate the pipeline on a 1-month sample -> data/processed/sample/
-	$(BIN)/python scripts/build_dataset.py --root data/raw/r4.2 --months 1
+	$(KEEPAWAKE) $(BIN)/python scripts/build_dataset.py --root data/raw/r4.2 --months 1
 
-dataset: ## Build the full 17-month train/val/test splits -> data/processed/
-	$(BIN)/python scripts/build_dataset.py --root data/raw/r4.2
+dataset: ## Build the full 17-month train/val/test splits -> data/processed/ (~2 h)
+	$(KEEPAWAKE) $(BIN)/python scripts/build_dataset.py --root data/raw/r4.2
 
 train: ## Train autoencoder + isolation forest over 5 seeds -> models/
-	$(BIN)/python scripts/train.py
+	$(KEEPAWAKE) $(BIN)/python scripts/train.py
 
 eval: ## Regenerate every table and figure in results/ from scratch
-	$(BIN)/python scripts/evaluate.py
+	$(KEEPAWAKE) $(BIN)/python scripts/evaluate.py
 	$(BIN)/python scripts/ablation.py
 
 ablation: ## Table VI only
 	$(BIN)/python scripts/ablation.py
 
 latency: ## Fig. 5 — added latency by stage, 50k requests at 200 rps
-	$(BIN)/python scripts/latency_bench.py
+	$(KEEPAWAKE) $(BIN)/python scripts/latency_bench.py
 
 tamper: ## Table VII — 500 tamper attempts + 10k clean control run
-	$(BIN)/python scripts/tamper_test.py
+	$(KEEPAWAKE) $(BIN)/python scripts/tamper_test.py
 
 serve: ## Run the PDP locally on :8000
 	$(BIN)/uvicorn ztb.pdp.app:app --reload --port 8000

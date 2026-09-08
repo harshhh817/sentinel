@@ -78,7 +78,8 @@ make dataset    # full 17 months -> data/processed/{train,val,test}.parquet
 ```
 
 The split is by time — first 10 months train (benign only), next 2 validation, last 5 test —
-never random. The mapper streams every file, so `http.csv` (~10 GB) is never loaded into memory;
+never random. The full run takes about two hours; on macOS the Makefile wraps it in
+`caffeinate -dims` so the machine cannot idle-sleep and eject the external disk mid-run. The mapper streams every file, so `http.csv` (~10 GB) is never loaded into memory;
 measured peak RSS is flat at ~135 MB regardless of corpus size.
 
 Budget roughly **2 GB** for `data/processed/` on top of the raw corpus (measured at 59 bytes per
