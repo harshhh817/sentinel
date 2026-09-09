@@ -84,7 +84,7 @@ def evaluate(
     *,
     seeds: list[int] | None = None,
     device: str = "cpu",
-    supervised_subsample: int = 500_000,
+    supervised_subsample: int = 300_000,
     eval_subsample: int | None = None,
     make_figures: bool = True,
 ) -> dict:
@@ -206,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, default=RESULTS)
     ap.add_argument("--seeds", type=int, nargs="*", default=None)
     ap.add_argument("--device", default="cpu")
-    ap.add_argument("--supervised-subsample", type=int, default=500_000)
+    ap.add_argument("--supervised-subsample", type=int, default=300_000)
     ap.add_argument("--eval-subsample", type=int, default=None,
                     help="score only a seeded sample of test rows (default: all)")
     ap.add_argument("--no-figures", action="store_true")

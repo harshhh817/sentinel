@@ -19,9 +19,12 @@ def make_baseline(name: str, seed: int = 0, n_jobs: int = -1):
     if name == "logistic_regression":
         return LogisticRegression(max_iter=2000, class_weight="balanced", random_state=seed)
     if name == "random_forest":
+        # Bounded trees: unbounded depth on ~1 M labelled rows grows ~1 M-node trees,
+        # and 200 of them exceed the memory of a laptop. 4096 leaves x 200 trees is a
+        # few hundred MB and loses little on 34 features.
         return RandomForestClassifier(
             n_estimators=200, class_weight="balanced_subsample", min_samples_leaf=2,
-            random_state=seed, n_jobs=n_jobs,
+            max_depth=16, max_leaf_nodes=4096, random_state=seed, n_jobs=n_jobs,
         )
     raise ValueError(f"unknown baseline {name!r}")
 

@@ -81,7 +81,11 @@ class RiskEngine:
     # --- scoring -----------------------------------------------------------
 
     def standardise(self, x_raw: np.ndarray) -> np.ndarray:
-        return self.standardiser.transform(x_raw.astype(np.float64)).astype(np.float32)
+        # float32 throughout: a float64 round trip doubles the peak on millions of rows.
+        x = np.asarray(x_raw, dtype=np.float32)
+        mean = self.standardiser.mean.astype(np.float32)
+        std = self.standardiser.std.astype(np.float32)
+        return (x - mean) / std
 
     def raw_scores(self, x_std: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         return (self.autoencoder.reconstruction_error(x_std),
