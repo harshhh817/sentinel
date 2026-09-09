@@ -17,7 +17,8 @@ models/*
 *.pem
 keys/
 
-# off-chain evidence store and local ledger spool
+# PDP runtime state: keys, local ledger, off-chain evidence store
+state/
 evidence/
 *.jsonl
 

@@ -31,7 +31,7 @@ request ─▶ PEP (auth + device posture)
 | 0 | Scaffold, dependencies, Makefile | **done** |
 | 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | **verified on 1-month sample; full run pending** |
 | 2 | Risk engine, trust algorithm, Tables V and VI | **code done, verified on synthetic data; real run pending** |
-| 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | not started |
+| 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | **done (local mode)** |
 | 4 | Fabric chaincode, committer, tamper experiment, Table VII | not started |
 | 5 | AWS cloud mode (optional) | not started |
 
@@ -135,6 +135,37 @@ Two places where the implementation departs from the paper's text, both delibera
 `evaluate.py` reports every model at the paper's operating threshold R ≥ 0.85 **and** at a
 threshold tuned for F1 on the validation window, because a benign-quantile r cannot give a 0.4 %
 false-positive rate at R ≥ 0.85 (see the Module 2 report).
+
+## PDP service (Module 3, local mode)
+
+```bash
+make serve                                   # ZTB_MODELS=models uvicorn ztb.pdp.app:app --port 8000
+make latency                                 # Fig. 5: 50k requests at 200 rps -> results/fig5.csv
+curl -s localhost:8000/authorize -H 'content-type: application/json' -d '{
+  "principal": "CDE1846", "action": "s3:GetObject",
+  "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+  "context": {"device_id": "PC-0001", "device_managed": true,
+              "mfa_age_seconds": 60, "mfa_hardware_backed": true}}'
+curl -s localhost:8000/records/CDE1846        # this principal's audit records, in seq order
+curl -s localhost:8000/verify/CDE1846         # VerifyChain: first discontinuity or intact
+```
+
+`POST /authorize` implements Algorithm 1 line by line and returns the verdict, the scoped
+credential (signed mock token locally; STS behind `ZTB_MODE=cloud`), the signed audit record of
+eq. (5), the risk breakdown and per-stage timings. Static entitlement (`ztb/pdp/policies/*.json`,
+RBAC + ABAC, deny-by-default) is evaluated first and a static denial is final. A STEP-UP verdict
+returns a signed challenge; presenting it as `step_up_token` on the retry counts as a fresh
+hardware-backed MFA on a managed device.
+
+**The compensating-control credit c comes from the request's auth context here** (managed device
+× MFA freshness over 8 h × hardware-backed bonus), which is what the CERT replay could not supply.
+A stolen key on an unmanaged host gets no credit; a user who just passed hardware MFA on a managed
+laptop gets the full β = 0.25 discount.
+
+Records are ECDSA-P-256-signed over a canonical JSON of the tuple, hash-chained per principal
+(`seq`, `prevHash`), and carry `h_feat = SHA-256(x ‖ salt)`; the vector and salt go to a
+Fernet-encrypted off-chain store under `state/evidence/`. The committer drains an asyncio queue
+into an append-only JSONL ledger under `state/ledger/` until the Fabric client lands in Module 4.
 
 ## Notes
 
