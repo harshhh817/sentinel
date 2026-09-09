@@ -117,8 +117,12 @@ class SplitWriter:
 
     def close(self) -> None:
         self.flush()
-        if self._writer is not None:
-            self._writer.close()
+        if self._writer is None:
+            # Always leave a (possibly empty) file so downstream scripts can rely on it.
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            pq.write_table(self.schema.empty_table(), self.path, compression="snappy")
+            return
+        self._writer.close()
 
 
 def arrow_schema() -> pa.Schema:
@@ -173,8 +177,12 @@ def build(
           f"<= val < {bounds.val_end.isoformat()} <= test")
 
     schema = arrow_schema()
+    # train_malicious holds the scripted-scenario rows that fall inside the training
+    # window. The unsupervised detectors never see them (Section V); the supervised
+    # baselines of Table V do, which is what makes them "trained with malicious
+    # labels available".
     writers = {name: SplitWriter(out_dir / f"{name}.parquet", schema)
-               for name in ("train", "val", "test")}
+               for name in ("train", "train_malicious", "val", "test")}
     store = BaselineStore()
     # Welford accumulator, not a list of vectors: the training window does not fit in
     # memory on the full corpus.
@@ -195,10 +203,11 @@ def build(
 
         split = bounds.of(event.ts)
         # The training window is benign-only (Section V): both detectors are
-        # unsupervised and must never see a scripted scenario.
+        # unsupervised and must never see a scripted scenario. Those rows go to a
+        # side file for the supervised baselines instead of being discarded.
         if split == "train" and event.label == 1:
             train_malicious_dropped += 1
-            continue
+            split = "train_malicious"
 
         row = {
             "event_id": event.event_id,
@@ -252,7 +261,7 @@ def build(
             }
             for name, w in writers.items()
         },
-        "labels": label_report(labels, seen, positives + train_malicious_dropped),
+        "labels": label_report(labels, seen, positives),
         "standardiser_fitted_on": "train" if standardiser else None,
         "standardiser_rows": len(train_stats),
     }

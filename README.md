@@ -30,7 +30,7 @@ request ─▶ PEP (auth + device posture)
 |---|---|---|
 | 0 | Scaffold, dependencies, Makefile | **done** |
 | 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | **verified on 1-month sample; full run pending** |
-| 2 | Risk engine, trust algorithm, Tables V and VI | not started |
+| 2 | Risk engine, trust algorithm, Tables V and VI | **code done, verified on synthetic data; real run pending** |
 | 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | not started |
 | 4 | Fabric chaincode, committer, tamper experiment, Table VII | not started |
 | 5 | AWS cloud mode (optional) | not started |
@@ -109,6 +109,32 @@ source:
 | Fig. 3, 4 (bar chart, ROC) | `scripts/evaluate.py` → `results/fig3.png`, `results/fig4.png` |
 | Fig. 5 (latency by stage) | `scripts/latency_bench.py` → `results/fig5.csv` |
 | Fig. 6 (ledger throughput) | `scripts/ledger_bench.py` → `results/fig6.csv` |
+
+## Risk engine (Module 2)
+
+```bash
+make train                      # 5 seeds -> models/   (--data / --models / --out on every script)
+make eval                       # Table V, Table VI, Fig. 3, Fig. 4 -> results/
+make eval DATA=/x OUT=/tmp/o    # any split directory with the build_dataset schema
+```
+
+Two places where the implementation departs from the paper's text, both deliberate:
+
+- **eq. (4) as typeset**, `1 − (1−r)^(1+λs)·(1−βc)`, makes the compensating-control credit
+  *raise* risk (R = βc for a perfectly normal request). `ztb/risk/trust.py` implements the evident
+  intent, `[1 − (1−r)^(1+λs)]·(1−βc)`, and keeps `literal=True` for comparison.
+- **The supervised baselines** need malicious training rows, but the training window is benign-only
+  by construction. `build_dataset` writes the scripted-scenario rows it removes from the training
+  window to `train_malicious.parquet`; the baselines train on benign train + that file.
+
+- **The compensating-control credit c is 0 throughout the CERT replay.** The corpus has no MFA
+  or managed-device signal, and deriving c from the synthesised device features caps R at 0.75
+  for nearly every request, making DENY unreachable. The PDP computes c from a real
+  authentication context in Module 3.
+
+`evaluate.py` reports every model at the paper's operating threshold R ≥ 0.85 **and** at a
+threshold tuned for F1 on the validation window, because a benign-quantile r cannot give a 0.4 %
+false-positive rate at R ≥ 0.85 (see the Module 2 report).
 
 ## Notes
 

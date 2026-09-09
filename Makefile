@@ -2,6 +2,10 @@
 # Local mode is the default; nothing here needs AWS.
 
 PYTHON      ?= python3.11
+# Override on the command line, e.g. make eval DATA=/path/to/splits OUT=/tmp/out
+DATA        ?= data/processed
+MODELS      ?= models
+OUT         ?= results
 VENV        ?= .venv
 BIN         := $(VENV)/bin
 UV          := $(shell command -v uv 2> /dev/null)
@@ -42,15 +46,15 @@ sample: ## Validate the pipeline on a 1-month sample -> data/processed/sample/
 dataset: ## Build the full 17-month train/val/test splits -> data/processed/ (~2 h)
 	$(KEEPAWAKE) $(BIN)/python scripts/build_dataset.py --root data/raw/r4.2
 
-train: ## Train autoencoder + isolation forest over 5 seeds -> models/
-	$(KEEPAWAKE) $(BIN)/python scripts/train.py
+train: ## Train autoencoder + isolation forest over 5 seeds -> $(MODELS)
+	$(KEEPAWAKE) $(BIN)/python scripts/train.py --data $(DATA) --models $(MODELS)
 
-eval: ## Regenerate every table and figure in results/ from scratch
-	$(KEEPAWAKE) $(BIN)/python scripts/evaluate.py
-	$(BIN)/python scripts/ablation.py
+eval: ## Regenerate Table V/VI and Figs. 3-4 -> $(OUT)
+	$(KEEPAWAKE) $(BIN)/python scripts/evaluate.py --data $(DATA) --models $(MODELS) --out $(OUT)
+	$(KEEPAWAKE) $(BIN)/python scripts/ablation.py --data $(DATA) --models $(MODELS) --out $(OUT)
 
-ablation: ## Table VI only
-	$(BIN)/python scripts/ablation.py
+ablation: ## Table VI only -> $(OUT)
+	$(KEEPAWAKE) $(BIN)/python scripts/ablation.py --data $(DATA) --models $(MODELS) --out $(OUT)
 
 latency: ## Fig. 5 — added latency by stage, 50k requests at 200 rps
 	$(KEEPAWAKE) $(BIN)/python scripts/latency_bench.py

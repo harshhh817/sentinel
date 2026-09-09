@@ -82,7 +82,7 @@ def test_training_window_is_benign_only(built):
 def test_malicious_events_land_in_the_held_out_windows(built):
     report = built["report"]
     positives = sum(report["splits"][s]["positives"] for s in ("val", "test"))
-    dropped = report["train_malicious_dropped"]
+    dropped = report["splits"]["train_malicious"]["positives"]
     assert positives + dropped == len(built["corpus"]["malicious_ids"])
     assert positives > 0, "fixture should place malicious events after the train window"
 
@@ -106,9 +106,19 @@ def test_standardiser_is_fitted_on_train_only(built):
 
 def test_report_counts_reconcile(built):
     report = built["report"]
-    written = sum(report["splits"][s]["rows"] for s in ("train", "val", "test"))
-    assert written + report["train_malicious_dropped"] == report["events_mapped"]
+    written = sum(report["splits"][s]["rows"] for s in report["splits"])
+    assert written == report["events_mapped"]
+    assert report["splits"]["train_malicious"]["rows"] == report["train_malicious_dropped"]
     assert report["events_mapped"] == built["corpus"]["total_events"]
+
+
+def test_train_malicious_side_file_is_all_positive_and_in_train_window(built):
+    tm = _read(built["out"], "train_malicious")
+    train = _read(built["out"], "train")
+    assert set(tm["label"]) <= {1}
+    if tm["ts"]:
+        assert max(tm["ts"]) < min(_read(built["out"], "val")["ts"])
+        assert not (set(tm["event_id"]) & set(train["event_id"]))
 
 
 def test_report_is_persisted(built):
