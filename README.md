@@ -29,7 +29,7 @@ request ─▶ PEP (auth + device posture)
 | Module | Scope | State |
 |---|---|---|
 | 0 | Scaffold, dependencies, Makefile | **done** |
-| 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | **verified on 1-month sample; full run pending** |
+| 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | **done** |
 | 2 | Risk engine, trust algorithm, Tables V and VI | **code done, verified on synthetic data; real run pending** |
 | 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | **done (local mode)** |
 | 4 | Fabric chaincode, committer, tamper experiment, Table VII | not started |
@@ -82,8 +82,22 @@ never random. The full run takes about two hours; on macOS the Makefile wraps it
 `caffeinate -dims` so the machine cannot idle-sleep and eject the external disk mid-run. The mapper streams every file, so `http.csv` (~10 GB) is never loaded into memory;
 measured peak RSS is flat at ~135 MB regardless of corpus size.
 
-Budget roughly **2 GB** for `data/processed/` on top of the raw corpus (measured at 59 bytes per
-event over 34 features plus metadata).
+Budget roughly **3.2 GB** for `data/processed/` on top of the raw corpus.
+
+Full 17-month run (`results/module1_dataset_report.json`, 1 h 24 min on an M2, RSS flat at ~130 MB):
+
+| Split | Rows | Positives | Rate |
+|---|---:|---:|---:|
+| train (benign only) | 19,209,477 | 0 | — |
+| train_malicious (sidelined scenario rows) | 3,975 | 3,975 | — |
+| val | 3,251,437 | 1,124 | 0.035 % |
+| test | 7,675,354 | 1,754 | 0.023 % |
+
+30,140,243 events in total (94 % http), 1,000 principals; 6,853 of the 7,323 malicious ids in
+`answers/` matched — the missing 470 are `email.csv` events, which the paper's mapping does not
+cover. The paper's test window (2,184,663 events, 0.179 % positive) is a different cut of the
+corpus; ours is larger and sparser because http dominates and most scenarios begin inside the
+training window.
 
 `data/raw` is a symlink to an external disk (the corpus is ~20 GB extracted) and is gitignored;
 `answers/` ships as a separate archive on KiltHub and must sit at `data/raw/r4.2/answers/`.

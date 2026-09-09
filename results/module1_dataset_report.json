@@ -1,0 +1,61 @@
+{
+  "root": "data/raw/r4.2",
+  "out_dir": "/Users/harshgupta/projects/ztbaudit/data/processed",
+  "months_sampled": null,
+  "boundaries": {
+    "corpus_start": "2010-01-02T06:49:00",
+    "train_end": "2010-11-02T16:25:00",
+    "val_end": "2011-01-02T13:32:12"
+  },
+  "events_mapped": 30140243,
+  "events_by_source": {
+    "device": 405380,
+    "file": 445581,
+    "http": 28434423,
+    "logon": 854859
+  },
+  "events_by_action": {
+    "execute-api:Invoke": 28434423,
+    "s3:GetObject": 850961,
+    "sts:AssumeRole": 470591,
+    "sts:SessionEnd": 384268
+  },
+  "principals": 1000,
+  "train_malicious_dropped": 3975,
+  "splits": {
+    "train": {
+      "rows": 19209477,
+      "positives": 0,
+      "positive_rate_pct": 0.0
+    },
+    "train_malicious": {
+      "rows": 3975,
+      "positives": 3975,
+      "positive_rate_pct": 100.0
+    },
+    "val": {
+      "rows": 3251437,
+      "positives": 1124,
+      "positive_rate_pct": 0.0346
+    },
+    "test": {
+      "rows": 7675354,
+      "positives": 1754,
+      "positive_rate_pct": 0.0229
+    }
+  },
+  "labels": {
+    "malicious_event_ids_in_answers": 7323,
+    "insider_principals": 70,
+    "scenarios": {
+      "r4.2-1": 345,
+      "r4.2-2": 6765,
+      "r4.2-3": 213
+    },
+    "events_seen": 30140243,
+    "positives_matched": 6853,
+    "positive_rate_pct": 0.0227
+  },
+  "standardiser_fitted_on": "train",
+  "standardiser_rows": 19209477
+}
