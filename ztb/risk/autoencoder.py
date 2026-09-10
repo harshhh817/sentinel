@@ -116,18 +116,21 @@ def train_autoencoder(
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=config.epochs)
     loss_fn = nn.MSELoss(reduction="none")
 
-    xt = torch.as_tensor(x_train, dtype=torch.float32, device=dev)
-    xv = torch.as_tensor(x_val, dtype=torch.float32, device=dev)
+    # Data stays on the CPU; each batch is moved to the device. Indexing a
+    # million-row tensor resident on MPS trips a Metal assertion in torch 2.1, and
+    # keeping the full matrix off the GPU is cheaper on an 8 GB machine anyway.
+    xt = torch.as_tensor(x_train, dtype=torch.float32)
+    xv = torch.as_tensor(x_val, dtype=torch.float32)
     gen = torch.Generator(device="cpu").manual_seed(seed)
 
     best_state, best_val, best_epoch, bad = None, float("inf"), -1, 0
     tl, vl = [], []
     for epoch in range(config.epochs):
         model.train()
-        perm = torch.randperm(len(xt), generator=gen).to(dev)
+        perm = torch.randperm(len(xt), generator=gen)
         total = 0.0
         for i in range(0, len(xt), config.batch_size):
-            xb = xt[perm[i:i + config.batch_size]]
+            xb = xt[perm[i:i + config.batch_size]].to(dev, non_blocking=True)
             if len(xb) < 2:                     # BatchNorm needs > 1 row
                 continue
             opt.zero_grad(set_to_none=True)
@@ -142,7 +145,7 @@ def train_autoencoder(
         with torch.no_grad():
             v = 0.0
             for i in range(0, len(xv), 65_536):
-                xb = xv[i:i + 65_536]
+                xb = xv[i:i + 65_536].to(dev)
                 v += loss_fn(model(xb), xb).sum(dim=1).sum().item()
             v /= max(1, len(xv))
         vl.append(v)
