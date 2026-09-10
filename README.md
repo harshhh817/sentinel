@@ -30,7 +30,7 @@ request ─▶ PEP (auth + device posture)
 |---|---|---|
 | 0 | Scaffold, dependencies, Makefile | **done** |
 | 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | **done** |
-| 2 | Risk engine, trust algorithm, Tables V and VI | **code done, verified on synthetic data; real run pending** |
+| 2 | Risk engine, trust algorithm, Tables V and VI | **done — see Results** |
 | 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | **done (local mode)** |
 | 4 | Fabric chaincode, committer, tamper experiment, Table VII | not started |
 | 5 | AWS cloud mode (optional) | not started |
@@ -149,6 +149,41 @@ Two places where the implementation departs from the paper's text, both delibera
 `evaluate.py` reports every model at the paper's operating threshold R ≥ 0.85 **and** at a
 threshold tuned for F1 on the validation window, because a benign-quantile r cannot give a 0.4 %
 false-positive rate at R ≥ 0.85 (see the Module 2 report).
+
+## Results on the real corpus (Module 2)
+
+Five seeds, 1 M-row training subsample per seed, evaluated on a seeded 4,000,767-row sample of the
+test window (947 positives). Supervised baselines trained on benign train + `train_malicious`.
+Source: `results/table_v.csv`, `results/table_v_per_seed.json`, `results/fig3.png`, `results/fig4.png`.
+
+| Model | AUC | Prec. / Rec. / F1 @ R ≥ 0.85 | FPR @ R ≥ 0.85 | F1 @ val-tuned threshold |
+|---|---:|---:|---:|---:|
+| Logistic regression † | 0.940 | 0.000 / 1.000 / 0.001 | 50.8 % | 0.003 |
+| Random forest † | **0.997** | 0.077 / 0.665 / 0.139 | 0.19 % | **0.269** |
+| Isolation forest | 0.774 | 0.000 / 0.723 / 0.001 | 41.8 % | 0.005 |
+| Deep autoencoder | 0.680 | 0.000 / 0.975 / 0.000 | 92.7 % | 0.002 |
+| Proposed hybrid (α = 0.6) | 0.748 | 0.000 / 0.921 / 0.001 | 72.0 % | 0.004 |
+
+† supervised. Paper (Table V): hybrid F1 0.927, AUC 0.964, FPR 0.41 %.
+
+**The paper's unsupervised numbers do not reproduce on this replay, and the reason is
+identifiable.** `results/module2_auc_by_source.csv` breaks the validation-window AUC down by CERT
+source: 94 % of events are http, so the benign calibration CDFs are http-shaped, and *every*
+logon/device/file event — structurally different in its action, resource and sensitivity features —
+lands at benign r ≈ 0.94 regardless of intent. The engine has learned "is not http", not "is unusual
+for this principal". Device events, where 566 of the 1,124 validation positives live, score AUC 0.56;
+the corpus-wide 0.82 on val is almost entirely the http subset.
+
+Two consequences. First, the features do carry the signal: the random forest reaches AUC 0.997 on
+identical features and splits. It is the single-manifold, globally-calibrated unsupervised design
+that fails at event level here. Second, the paper's test window (2,184,663 events) is about a quarter
+of ours, which is consistent with http not having been replayed at event level in the paper; that
+alone would remove the dominance effect. The cheapest principled fix within the paper's design is to
+fit F̂ₑ and F̂ₛ **per event source**, so r reads as "the fraction of benign events *of this kind*
+this one exceeds"; it needs no retraining and is left as the next step.
+
+The fixed operating threshold R ≥ 0.85 is unusable for the unsupervised models on any replay where r
+is a benign quantile (FPR 42–93 % here); the val-tuned column is the honest operating point.
 
 ## PDP service (Module 3, local mode)
 
