@@ -19,11 +19,13 @@ from ztb.features.builder import FEATURE_NAMES  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _results_in_tmp(tmp_path, monkeypatch):
-    """Never let a test write synthetic numbers into the committed results/ directory."""
+def _repo_dirs_in_tmp(tmp_path, monkeypatch):
+    """Never let a test write synthetic numbers into results/ -- or a synthetic
+    standardiser into models/, which once silently corrupted a real evaluation."""
     import build_dataset
 
     monkeypatch.setattr(build_dataset, "RESULTS", tmp_path / "results")
+    monkeypatch.setattr(build_dataset, "MODELS", tmp_path / "models")
 
 
 @pytest.fixture(scope="module")
@@ -33,8 +35,13 @@ def built(tmp_path_factory):
     root = write_corpus(tmp_path_factory.mktemp("cert") / "r4.2", days=400, events_per_day=6)
     out = tmp_path_factory.mktemp("processed")
     build_dataset.RESULTS = tmp_path_factory.mktemp("results")   # module-scoped: set directly
+    build_dataset.MODELS = tmp_path_factory.mktemp("models")
     report = build(root["root"], out, progress_every=0)
     return {"corpus": root, "out": out, "report": report}
+
+
+def test_standardiser_is_written_beside_the_splits(built):
+    assert (built["out"] / "standardiser.json").exists()
 
 
 def _read(out: Path, split: str):

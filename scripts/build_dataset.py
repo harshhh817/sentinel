@@ -239,8 +239,12 @@ def build(
     standardiser = None
     if len(train_stats):
         standardiser = train_stats.finalize()
+        payload_std = json.dumps(standardiser.to_dict(), indent=2)
+        # Beside the splits is authoritative (train.py looks there first); models/ is a
+        # convenience copy for the PDP.
+        (out_dir / "standardiser.json").write_text(payload_std)
         MODELS.mkdir(parents=True, exist_ok=True)
-        (MODELS / "standardiser.json").write_text(json.dumps(standardiser.to_dict(), indent=2))
+        (MODELS / "standardiser.json").write_text(payload_std)
 
     positives = sum(w.positives for w in writers.values())
     report = {
