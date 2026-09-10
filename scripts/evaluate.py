@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ztb.config import DATA_PROCESSED, MODELS, RESULTS  # noqa: E402
 from ztb.risk.baselines import SUPERVISED, baseline_risk, fit_baseline  # noqa: E402
 from ztb.risk.data import load_split  # noqa: E402
-from ztb.risk.fusion import RiskEngine, fuse, seeds_available  # noqa: E402
+from ztb.risk.fusion import fuse, load_engine, seeds_available  # noqa: E402
 from ztb.risk.metrics import at_threshold, best_f1_threshold, summarise  # noqa: E402
 from ztb.risk.trust import DENY_THRESHOLD, effective_risk  # noqa: E402
 
@@ -43,9 +43,9 @@ LABELS = {
 }
 
 
-def risk_scores(engine: RiskEngine, x: np.ndarray) -> dict[str, np.ndarray]:
+def risk_scores(engine, x: np.ndarray, types: np.ndarray | None = None) -> dict[str, np.ndarray]:
     """r for the three unsupervised variants from one pass through the detectors."""
-    sc = engine.score(x)
+    sc = engine.score(x, types=types)
     return {
         "hybrid": sc.r,
         "autoencoder": fuse(sc.f_e, sc.f_s, 1.0),
@@ -93,8 +93,8 @@ def evaluate(
     if not seeds:
         raise SystemExit(f"no trained engines in {models}; run scripts/train.py")
 
-    val = load_split(data / "val.parquet")
-    test = load_split(data / "test.parquet", max_rows=eval_subsample, seed=0)
+    val = load_split(data / "val.parquet", with_types=True)
+    test = load_split(data / "test.parquet", max_rows=eval_subsample, seed=0, with_types=True)
     print(f"val {len(val):,} rows ({int(val.y.sum())} pos)   "
           f"test {len(test):,} rows ({int(test.y.sum())} pos)", flush=True)
 
@@ -103,9 +103,9 @@ def evaluate(
     sup_source = None
     for seed in seeds:
         print(f"== seed {seed}", flush=True)
-        engine = RiskEngine.load(models, seed, device)
-        r_val = risk_scores(engine, _select(val.x, engine))
-        r_test = risk_scores(engine, _select(test.x, engine))
+        engine = load_engine(models, seed, device)
+        r_val = risk_scores(engine, _select(val.x, engine), val.types)
+        r_test = risk_scores(engine, _select(test.x, engine), test.types)
 
         x_sup, y_sup, sup_source = supervised_training_set(data, seed, supervised_subsample)
         x_sup = engine.standardise(x_sup)
@@ -135,14 +135,15 @@ def evaluate(
     _write_table_v(out / "table_v.csv", table)
     (out / "table_v_per_seed.json").write_text(json.dumps(
         {"seeds": seeds, "supervised_labels_from": sup_source, "per_seed": per_seed,
-         "test_rows": int(len(test)), "test_positives": int(test.y.sum())}, indent=2))
+         "test_rows": int(len(test)), "test_positives": int(test.y.sum()),
+         "calibration": getattr(engine, "calibration", "global")}, indent=2))
     if make_figures:
         _figures(out, table, roc_store)
     print(f"wrote {out/'table_v.csv'}")
     return table
 
 
-def _select(x: np.ndarray, engine: RiskEngine) -> np.ndarray:
+def _select(x: np.ndarray, engine) -> np.ndarray:
     from ztb.features.builder import FEATURE_NAMES
     if engine.feature_names == FEATURE_NAMES:
         return x

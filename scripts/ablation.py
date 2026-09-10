@@ -34,7 +34,7 @@ from ztb.config import DATA_PROCESSED, FUSION_ALPHA, MODELS, RESULTS  # noqa: E4
 from ztb.features.builder import FEATURE_NAMES, VOLUME_FEATURES  # noqa: E402
 from ztb.risk.autoencoder import AEConfig  # noqa: E402
 from ztb.risk.data import Split, feature_index, load_split  # noqa: E402
-from ztb.risk.fusion import RiskEngine, fuse, seeds_available  # noqa: E402
+from ztb.risk.fusion import PerSourceEngine, fuse, load_engine, seeds_available  # noqa: E402
 from ztb.risk.metrics import at_threshold, best_f1_threshold, summarise  # noqa: E402
 from ztb.risk.trust import DENY_THRESHOLD, effective_risk  # noqa: E402
 
@@ -86,16 +86,21 @@ def ablation(
     if not seeds:
         raise SystemExit(f"no trained engines in {models}; run scripts/train.py")
 
-    val = load_split(data / "val.parquet", with_action=True)
-    test = load_split(data / "test.parquet", max_rows=eval_subsample, seed=0, with_action=True)
+    val = load_split(data / "val.parquet", with_action=True, with_types=True)
+    test = load_split(data / "test.parquet", max_rows=eval_subsample, seed=0, with_action=True,
+                      with_types=True)
     train_actions = load_split(data / "train.parquet", max_rows=subsample, seed=0,
                                with_action=True).action
     results: dict[str, list[dict]] = {k: [] for k, _ in VARIANTS}
 
     for seed in seeds:
         print(f"== seed {seed}", flush=True)
-        engine = RiskEngine.load(models, seed, device)
-        sv, st = engine.score(val.x), engine.score(test.x)
+        engine = load_engine(models, seed, device)
+        if isinstance(engine, PerSourceEngine):
+            raise SystemExit("ablation is defined for a single engine; per-source models "
+                             "report Table V only (see scripts/evaluate.py)")
+        calibration = engine.calibration
+        sv, st = engine.score(val.x, types=val.types), engine.score(test.x, types=test.types)
         m = lambda r_t, r_v, **kw: _metrics(  # noqa: E731
             test.y, r_t, test.sensitivity, test.credit,
             val.y, r_v, val.sensitivity, val.credit, **kw)
@@ -109,16 +114,17 @@ def ablation(
         pre = global_action_frequency(train_actions)
         eng_g, _ = train_engine(data, seed=seed, epochs=epochs, subsample=subsample,
                                 val_subsample=val_subsample, alpha=FUSION_ALPHA,
-                                device=device, preprocess=pre)
+                                device=device, preprocess=pre, calibration=calibration)
         results["global_action_freq"].append(
-            m(eng_g.score(pre(test)).r, eng_g.score(pre(val)).r))
+            m(eng_g.score(pre(test), types=test.types).r, eng_g.score(pre(val), types=val.types).r))
 
         eng_r, _ = train_engine(data, seed=seed, epochs=epochs, subsample=subsample,
                                 val_subsample=val_subsample, alpha=FUSION_ALPHA,
-                                device=device, features=NO_RATE)
+                                device=device, features=NO_RATE, calibration=calibration)
         idx = [FEATURE_NAMES.index(f) for f in NO_RATE]
         results["no_rate_features"].append(
-            m(eng_r.score(test.x[:, idx]).r, eng_r.score(val.x[:, idx]).r))
+            m(eng_r.score(test.x[:, idx], types=test.types).r,
+              eng_r.score(val.x[:, idx], types=val.types).r))
 
         for key, _ in VARIANTS:
             print(f"   {key:22s} F1 {results[key][-1]['f1']:.3f}  "

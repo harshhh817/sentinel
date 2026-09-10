@@ -29,15 +29,20 @@ class Split:
     sensitivity: np.ndarray  # (n,) s in eq. (4)
     credit: np.ndarray       # (n,) c in eq. (4)
     action: np.ndarray | None = None
+    source: np.ndarray | None = None
+    types: np.ndarray | None = None   # event type per row, see ztb.risk.types
 
     def __len__(self) -> int:
         return len(self.y)
 
+    def subset(self, m: np.ndarray) -> Split:
+        pick = lambda a: None if a is None else a[m]  # noqa: E731
+        return Split(self.x[m], self.y[m], self.sensitivity[m], self.credit[m],
+                     pick(self.action), pick(self.source), pick(self.types))
+
     @property
     def benign(self) -> Split:
-        m = self.y == 0
-        return Split(self.x[m], self.y[m], self.sensitivity[m], self.credit[m],
-                     None if self.action is None else self.action[m])
+        return self.subset(self.y == 0)
 
 
 def feature_index(name: str) -> int:
@@ -86,13 +91,24 @@ def load_split(
     seed: int = 0,
     columns: tuple[str, ...] = FEATURE_NAMES,
     with_action: bool = False,
+    with_types: bool = False,
 ) -> Split:
-    """Load a split, optionally as a seeded uniform subsample of ``max_rows`` rows."""
+    """Load a split, optionally as a seeded uniform subsample of ``max_rows`` rows.
+
+    ``with_types`` also reads ``action`` and ``source`` and derives the event type per
+    row (needed for per-source calibration and per-source models).
+    """
+    from ztb.risk.types import event_type
+
     total = num_rows(path)
     keep = 1.0 if not max_rows or max_rows >= total else max_rows / total
     rng = np.random.default_rng(seed)
-    xs, ys, acts = [], [], []
-    meta_cols = ("label", "action") if with_action else ("label",)
+    xs, ys, acts, srcs = [], [], [], []
+    meta_cols: tuple[str, ...] = ("label",)
+    if with_action or with_types:
+        meta_cols += ("action",)
+    if with_types:
+        meta_cols += ("source",)
     for x, meta in iter_row_groups(path, columns=columns, with_meta=meta_cols):
         if keep < 1.0:
             m = rng.random(len(x)) < keep
@@ -100,15 +116,19 @@ def load_split(
             meta = {k: v[m] for k, v in meta.items()}
         xs.append(x)
         ys.append(meta["label"].astype(np.int8))
-        if with_action:
+        if "action" in meta:
             acts.append(meta["action"].astype(str))
+        if "source" in meta:
+            srcs.append(meta["source"].astype(str))
     x = np.vstack(xs) if xs else np.empty((0, len(columns)), np.float32)
     y = np.concatenate(ys) if ys else np.empty(0, np.int8)
     full = x if columns == FEATURE_NAMES else None
     sens = full[:, feature_index("resource_sensitivity")] if full is not None else np.zeros(len(y))
     cred = control_credit_from_features(full) if full is not None else np.zeros(len(y))
-    return Split(x, y, sens.astype(np.float32), cred.astype(np.float32),
-                 np.concatenate(acts) if acts else None)
+    action = np.concatenate(acts) if acts else None
+    source = np.concatenate(srcs) if srcs else None
+    types = event_type(action, source) if with_types and action is not None else None
+    return Split(x, y, sens.astype(np.float32), cred.astype(np.float32), action, source, types)
 
 
 def load_standardiser(data_dir: Path, models_dir: Path | None = None) -> Standardiser | None:

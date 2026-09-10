@@ -246,3 +246,107 @@ def test_cert_replay_grants_no_control_credit():
     x = np.random.default_rng(0).normal(size=(10, 34)).astype(np.float32)
     assert (control_credit_from_features(x) == 0).all()
     assert effective_risk(1.0, 0.0, 0.0) == 1.0          # deny is reachable
+
+
+# --- per-source calibration and per-source models ----------------------------
+
+
+def test_event_type_derivation():
+    from ztb.risk.types import event_type, event_type_one
+
+    a = np.array(["sts:AssumeRole", "sts:SessionEnd", "s3:GetObject", "s3:GetObject",
+                  "s3:PutObject", "s3:PutObject", "execute-api:Invoke"])
+    s = np.array(["logon", "logon", "device", "pdp", "file", "pdp", "http"])
+    assert list(event_type(a, s)) == ["sts", "sts", "egress", "s3_read", "egress", "s3_write",
+                                      "http"]
+    assert event_type_one("s3:GetObject", "pdp", "arn:aws:s3:::b/removable/x") == "egress"
+    assert event_type_one("s3:GetObject", "pdp", "arn:aws:s3:::b/x") == "s3_read"
+
+
+def test_split_loader_derives_types(synth):
+    from ztb.risk.data import load_split
+
+    val = load_split(synth["out_dir"] / "val.parquet", with_types=True)
+    assert val.types is not None and len(val.types) == len(val)
+    assert set(val.types) <= {"sts", "s3_read", "s3_write", "egress", "http"}
+    b = val.benign
+    assert len(b.types) == len(b) and (b.y == 0).all()
+
+
+def test_per_type_calibration_is_uniform_within_each_type(trained, synth):
+    """The point of the change: benign r ~ U(0,1) inside every event type."""
+    from ztb.risk.data import load_split
+
+    eng = RiskEngine.load(trained, 0)
+    val = load_split(synth["out_dir"] / "val.parquet", with_types=True).benign
+    e, s = eng.raw_scores(eng.standardise(val.x))
+    eng.calibrate_per_type(e, s, val.types, min_rows=50)
+    assert eng.calibration == "per_source" and set(eng.cdf_e_by_type) == set(np.unique(val.types))
+    r = eng.score(val.x, types=val.types).r
+    for typ in np.unique(val.types):
+        m = val.types == typ
+        assert abs(r[m].mean() - 0.5) < 0.08, f"{typ}: benign r mean {r[m].mean():.3f}"
+    # Without types the global CDFs are used and results differ.
+    assert not np.allclose(r, eng.score(val.x).r)
+
+
+def test_per_source_calibration_survives_save_load(trained, synth, tmp_path):
+    from ztb.risk.data import load_split
+
+    eng = RiskEngine.load(trained, 0)
+    val = load_split(synth["out_dir"] / "val.parquet", with_types=True).benign
+    e, s = eng.raw_scores(eng.standardise(val.x))
+    eng.calibrate_per_type(e, s, val.types, min_rows=50)
+    eng.save(tmp_path, 0)
+    back = RiskEngine.load(tmp_path, 0)
+    assert back.calibration == "per_source" and set(back.cdf_e_by_type) == set(eng.cdf_e_by_type)
+    np.testing.assert_allclose(back.score(val.x, types=val.types).r,
+                               eng.score(val.x, types=val.types).r)
+
+
+def test_train_recalibrate_and_per_source_models(synth, tmp_path):
+    from train import main as train_main
+
+    from ztb.risk.fusion import PerSourceEngine, load_engine
+
+    m1 = tmp_path / "m1"
+    assert train_main(["--data", str(synth["out_dir"]), "--models", str(m1), "--seeds", "0",
+                       "--epochs", "5", "--device", "cpu"]) == 0
+    assert load_engine(m1, 0).calibration == "global"
+    assert train_main(["--data", str(synth["out_dir"]), "--models", str(m1), "--seeds", "0",
+                       "--recalibrate", "--calibration", "per_source", "--device", "cpu"]) == 0
+    assert load_engine(m1, 0).calibration == "per_source"
+
+    m2 = tmp_path / "m2"
+    assert train_main(["--data", str(synth["out_dir"]), "--models", str(m2), "--seeds", "0",
+                       "--epochs", "5", "--per-source-models", "--device", "cpu"]) == 0
+    eng = load_engine(m2, 0)
+    assert isinstance(eng, PerSourceEngine) and eng.calibration == "per_source_models"
+    from ztb.risk.data import load_split
+
+    test = load_split(synth["out_dir"] / "test.parquet", with_types=True)
+    r = eng.score(test.x, types=test.types).r
+    assert r.shape == (len(test),) and ((r >= 0) & (r <= 1)).all()
+    assert r[test.y == 1].mean() > r[test.y == 0].mean()
+
+
+def test_evaluate_and_compare_across_variants(trained, synth, tmp_path):
+    from compare_variants import main as compare_main
+    from evaluate import evaluate
+    from train import main as train_main
+
+    res = tmp_path / "results"
+    evaluate(synth["out_dir"], trained, res / "global", seeds=[0], device="cpu",
+             make_figures=False)
+    m = tmp_path / "pscal"
+    import shutil
+
+    shutil.copytree(trained, m)
+    assert train_main(["--data", str(synth["out_dir"]), "--models", str(m), "--seeds", "0",
+                       "--recalibrate", "--calibration", "per_source", "--device", "cpu"]) == 0
+    evaluate(synth["out_dir"], m, res / "per_source_calibration", seeds=[0], device="cpu",
+             make_figures=False)
+    assert compare_main(["--results", str(res)]) == 0
+    rows = (res / "table_v_variants.csv").read_text().splitlines()
+    assert rows[0].startswith("model,global:auc") and "per_source_calibration:auc" in rows[0]
+    assert len(rows) == 6
