@@ -47,14 +47,14 @@ dataset: ## Build the full 17-month train/val/test splits -> data/processed/ (~2
 	$(KEEPAWAKE) $(BIN)/python scripts/build_dataset.py --root data/raw/r4.2
 
 train: ## Train autoencoder + isolation forest over 5 seeds -> $(MODELS)
-	$(KEEPAWAKE) $(BIN)/python scripts/train.py --data $(DATA) --models $(MODELS)
+	$(KEEPAWAKE) $(BIN)/python scripts/train.py --data "$(DATA)" --models "$(MODELS)"
 
 eval: ## Regenerate Table V/VI and Figs. 3-4 -> $(OUT)
-	$(KEEPAWAKE) $(BIN)/python scripts/evaluate.py --data $(DATA) --models $(MODELS) --out $(OUT)
-	$(KEEPAWAKE) $(BIN)/python scripts/ablation.py --data $(DATA) --models $(MODELS) --out $(OUT)
+	$(KEEPAWAKE) $(BIN)/python scripts/evaluate.py --data "$(DATA)" --models "$(MODELS)" --out "$(OUT)"
+	$(KEEPAWAKE) $(BIN)/python scripts/ablation.py --data "$(DATA)" --models "$(MODELS)" --out "$(OUT)"
 
 ablation: ## Table VI only -> $(OUT)
-	$(KEEPAWAKE) $(BIN)/python scripts/ablation.py --data $(DATA) --models $(MODELS) --out $(OUT)
+	$(KEEPAWAKE) $(BIN)/python scripts/ablation.py --data "$(DATA)" --models "$(MODELS)" --out "$(OUT)"
 
 latency: ## Fig. 5 — added latency by stage, 50k requests at 200 rps
 	$(KEEPAWAKE) $(BIN)/python scripts/latency_bench.py
