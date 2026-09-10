@@ -1,0 +1,11 @@
+{
+  "requests": 50000,
+  "target_rps": 200.0,
+  "achieved_rps": 200.0,
+  "elapsed_s": 250.0,
+  "verdicts": {
+    "DENY": 29824,
+    "STEPUP": 20176
+  },
+  "ledger_committed": 50000
+}

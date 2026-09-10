@@ -1,0 +1,9 @@
+stage,p50_ms,p95_ms,mean_ms
+static_policy,0.018,0.023,0.022
+feature_assembly,0.128,0.213,0.135
+inference,2.087,2.184,2.107
+trust,0.017,0.019,0.017
+credential,0.002,0.092,0.035
+record_sign_enqueue,0.269,0.319,0.277
+baseline_update,0.001,0.014,0.006
+total,2.573,2.785,2.601

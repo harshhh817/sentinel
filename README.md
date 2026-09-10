@@ -230,6 +230,24 @@ hardware-backed MFA on a managed device.
 A stolen key on an unmanaged host gets no credit; a user who just passed hardware MFA on a managed
 laptop gets the full β = 0.25 discount.
 
+**Fig. 5 (`results/fig5.csv`, `results/fig5_meta.json`).** 50,000 requests at a steady 200 rps
+against the real models, in-process through an ASGI transport, all 50,000 committed by the
+asynchronous committer:
+
+| Stage | p50 | p95 |
+|---|---:|---:|
+| static policy | 0.018 ms | 0.023 ms |
+| feature assembly | 0.128 ms | 0.213 ms |
+| inference (AE + forest + CDFs) | 2.087 ms | 2.184 ms |
+| trust + band | 0.017 ms | 0.019 ms |
+| credential | 0.002 ms | 0.092 ms |
+| record: digest, sign, enqueue | 0.269 ms | 0.319 ms |
+| **total added latency** | **2.573 ms** | **2.785 ms** |
+
+The paper reports 61.3 ms median / 109.8 ms p95, which includes the API Gateway → Lambda →
+SageMaker network hops; these figures are the PDP's own cost with the model co-located. Ledger
+commitment is off the path in both.
+
 Records are ECDSA-P-256-signed over a canonical JSON of the tuple, hash-chained per principal
 (`seq`, `prevHash`), and carry `h_feat = SHA-256(x ‖ salt)`; the vector and salt go to a
 Fernet-encrypted off-chain store under `state/evidence/`. The committer drains an asyncio queue
