@@ -1,0 +1,9 @@
+variant,f1,f1_std,delta_f1,auc,fpr_pct,tuned_f1
+Full system (alpha = 0.6),0.001,0.000,baseline,0.748,72.04,0.004
+Without isolation forest (alpha = 1.0),0.000,0.000,-0.000,0.680,92.68,0.002
+Without autoencoder (alpha = 0.0),0.001,0.000,+0.000,0.774,41.78,0.005
+Global instead of per-principal action frequency,0.001,0.000,-0.000,0.733,73.18,0.004
+Without sliding-window rate features,0.001,0.000,-0.000,0.764,87.11,0.005
+Without resource sensitivity in eq. (4),0.001,0.000,+0.001,0.734,22.27,0.002
+Fusion weight alpha = 0.4,0.001,0.000,+0.000,0.762,56.81,0.004
+Fusion weight alpha = 0.8,0.001,0.000,-0.000,0.723,87.44,0.004

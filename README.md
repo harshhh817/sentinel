@@ -185,6 +185,25 @@ this one exceeds"; it needs no retraining and is left as the next step.
 The fixed operating threshold R ≥ 0.85 is unusable for the unsupervised models on any replay where r
 is a benign quantile (FPR 42–93 % here); the val-tuned column is the honest operating point.
 
+**Ablation (Table VI, `results/table_vi.csv`).** At the fixed threshold every variant has F1 ≈ 0.001,
+so the paper's ΔF1 column carries no information here; the AUC column does, and it is consistent
+with the mechanism above:
+
+| Variant | AUC | Paper ΔF1 |
+|---|---:|---:|
+| Full system (α = 0.6) | 0.748 | baseline |
+| Without isolation forest (α = 1.0) | 0.680 | −0.033 |
+| Without autoencoder (α = 0.0) | **0.774** | −0.087 |
+| Global instead of per-principal action frequency | 0.733 | −0.051 |
+| Without sliding-window rate features | 0.764 | −0.024 |
+| Without resource sensitivity in eq. (4) | 0.734 | −0.016 |
+| α = 0.4 | 0.762 | −0.006 |
+| α = 0.8 | 0.723 | −0.009 |
+
+Removing the autoencoder *improves* AUC and shifting α toward the forest helps — the reverse of the
+paper, and what an http-shaped reconstruction manifold predicts. The one feature-level result that
+survives is the paper's headline one: per-principal action frequency beats a global one.
+
 ## PDP service (Module 3, local mode)
 
 ```bash
