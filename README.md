@@ -204,6 +204,43 @@ Removing the autoencoder *improves* AUC and shifting α toward the forest helps 
 paper, and what an http-shaped reconstruction manifold predicts. The one feature-level result that
 survives is the paper's headline one: per-principal action frequency beats a global one.
 
+### Progression: global → per-source calibration → per-source models
+
+`results/table_v_variants.csv` (built by `scripts/compare_variants.py` from `results/global/`,
+`results/per_source_calibration/`, `results/per_source_models/`; 5 seeds each, same 4,000,767-row
+test sample, 947 positives):
+
+| Model | global AUC | per-source calibration AUC | per-source models AUC |
+|---|---:|---:|---:|
+| Random forest † | 0.997 | 0.997 | 0.997 |
+| Logistic regression † | 0.940 | 0.940 | 0.940 |
+| Isolation forest | 0.774 | 0.469 | 0.570 |
+| Deep autoencoder | 0.680 | 0.466 | 0.441 |
+| Proposed hybrid | **0.748** | **0.481** | **0.525** |
+
+† supervised, unaffected by calibration by construction.
+
+- **Per-source calibration** (one CDF pair per event type — `sts`, `egress`, `http` on r4.2 — fitted
+  on the benign validation rows of that type, no retraining) removes the "is not http" artefact
+  entirely: benign r is uniform inside every type. What remains is the detectors' within-type
+  signal, and on the test window it is **chance** (hybrid 0.48). The global 0.75 was therefore
+  mostly a class-prior effect: malicious events are disproportionately non-http, and non-http
+  events sat at the top of an http-shaped benign quantile.
+- **Per-source models** (one autoencoder + forest per type, same architecture and
+  hyperparameters, trained on 43k `sts`, 42k `egress` and 1.4 M `http` benign rows per seed,
+  fused per type) recover a little forest signal (0.57) but the autoencoder stays *below* 0.5:
+  within their type, malicious rows reconstruct slightly *better* than benign ones. Hybrid 0.53.
+
+Conclusion for the write-up: on CERT r4.2 replayed at event level, the paper's unsupervised
+design — reconstruction and isolation over a per-request behavioural vector — does not separate
+the scripted scenarios from normal activity, in any of the three configurations, while a
+supervised model on the identical vectors does (0.997). The information the scenarios leave in
+these features is real but is not "off-manifold" in the sense the detectors look for; it is
+conditional structure a discriminative model picks up. Detecting it unsupervised would need
+different features (session- or day-level aggregates, content/topic signals from the http and
+file payloads the mapping discards) rather than a different calibration. The ablation for the
+per-source-calibration variant is in `results/per_source_calibration/table_vi.csv`.
+
 ## PDP service (Module 3, local mode)
 
 ```bash
