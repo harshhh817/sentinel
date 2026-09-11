@@ -1,0 +1,16 @@
+injection,detector,auc,injected_r_mean,benign_r_mean,frac_injected_r_ge_0.85
+3am_egress_50x_volume,autoencoder,1.0,1.0,0.4339,1.0
+3am_egress_50x_volume,iforest,0.977,0.9772,0.497,1.0
+3am_egress_50x_volume,hybrid,0.9972,0.9909,0.4591,1.0
+50x_volume_only,autoencoder,1.0,1.0,0.4339,1.0
+50x_volume_only,iforest,0.9545,0.954,0.497,1.0
+50x_volume_only,hybrid,0.9923,0.9816,0.4591,1.0
+3am_only,autoencoder,0.8072,0.7742,0.4339,0.2415
+3am_only,iforest,0.7922,0.7895,0.497,0.3447
+3am_only,hybrid,0.8133,0.7803,0.4591,0.2576
+novel_host_and_action,autoencoder,0.9965,0.9961,0.4339,1.0
+novel_host_and_action,iforest,0.8631,0.8613,0.497,0.6124
+novel_host_and_action,hybrid,0.9564,0.9422,0.4591,0.9997
+gaussian_noise_3sigma,autoencoder,1.0,1.0,0.4339,1.0
+gaussian_noise_3sigma,iforest,0.9909,0.9909,0.497,1.0
+gaussian_noise_3sigma,hybrid,0.999,0.9963,0.4591,1.0
