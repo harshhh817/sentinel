@@ -32,7 +32,7 @@ request ─▶ PEP (auth + device posture)
 | 1 | CERT → CloudTrail mapping, 34-dim feature builder, time split | **done** |
 | 2 | Risk engine, trust algorithm, Tables V and VI | **done — see Results** |
 | 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | **done (local mode)** |
-| 4 | Fabric chaincode, committer, tamper experiment, Table VII | not started |
+| 4 | Fabric chaincode, committer, tamper experiment, Table VII | **done (chaincode tested; live network needs Docker)** |
 | 5 | AWS cloud mode (optional) | not started |
 
 See `PLAN.md` for the full task list per module.
@@ -333,6 +333,45 @@ Records are ECDSA-P-256-signed over a canonical JSON of the tuple, hash-chained 
 (`seq`, `prevHash`), and carry `h_feat = SHA-256(x ‖ salt)`; the vector and salt go to a
 Fernet-encrypted off-chain store under `state/evidence/`. The committer drains an asyncio queue
 into an append-only JSONL ledger under `state/ledger/` until the Fabric client lands in Module 4.
+
+## Ledger (Module 4)
+
+`chaincode/auditcontract/` (Go) implements `LogAccess`, `QueryByPrincipal`, `QueryByResource`,
+`VerifyChain` and a one-time `SetPDPPublicKey`; there is no update or delete. `LogAccess` verifies
+the PDP's ECDSA-P-256 signature over a byte-exact port of the PDP's canonical JSON (the Go tests
+verify signatures made by `ztb/pdp/signer.py`), enforces per-principal `seq` continuity and
+`prevHash`, and rejects duplicate `recId`. `VerifyChain` re-walks the chain and checks the record
+count against the stored head, so a deleted *last* record is caught as well as an interior one.
+
+```bash
+cd chaincode/auditcontract && go test ./...             # no network needed
+ZTB_LEDGER=sim   make serve                              # reference ledger, in-process
+ZTB_LEDGER=fabric make serve                             # via ztb/ledger/shim (Node, Fabric Gateway)
+python scripts/tamper_test.py  --ledger sim|fabric       # Table VII
+python scripts/ledger_bench.py --ledger fabric           # Fig. 6
+```
+
+`chaincode/README.md` has the fabric-samples test-network setup (2 orgs, CouchDB), deployment,
+the shim, and how to extend to the paper's three organisations.
+
+**Table VII (`results/table_vii.csv`).** 500 tamper attempts by a privileged log manipulator —
+125 each of delete, modify-verdict, backdate, fabricate — against a mirrored JSONL log and the
+ledger, plus 10,000 untampered control records:
+
+| Metric | JSONL log | Ledger |
+|---|---:|---:|
+| attempts that succeeded | 500 / 500 | — |
+| attempts self-evident from the log alone | 0 / 500 | — |
+| tampering attempts detected | 0 / 500 | **500 / 500** |
+| false alarms over clean records | — | **0 / 10000** |
+
+Modification and fabrication are rejected at `LogAccess` (signature); deletion, including of a
+chain's tail, is caught by `VerifyChain`. **This Table VII was produced against
+`ztb/ledger/sim.py`, a Python reference implementation of exactly the chaincode's rules
+(`ledger=sim` in the CSV), because Docker is not installed on the development machine.** The Go
+chaincode enforces the same rules and is unit-tested against the same signatures; re-running
+with `--ledger fabric` on the test-network is a one-command step once Docker is present. Fig. 6
+(throughput vs offered load) is only meaningful on the live network and has not been produced.
 
 ## Notes
 

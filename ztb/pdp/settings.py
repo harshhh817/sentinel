@@ -22,6 +22,11 @@ class Settings:
     state_dir: Path = field(
         default_factory=lambda: Path(os.environ.get("ZTB_STATE", ROOT / "state")))
     device: str = field(default_factory=lambda: os.environ.get("ZTB_DEVICE", "cpu"))
+    # Ledger backend: jsonl (append-only file, Module 3), sim (in-process reference
+    # implementation of the chaincode rules), fabric (Hyperledger Fabric via the shim).
+    ledger: str = field(default_factory=lambda: os.environ.get("ZTB_LEDGER", "jsonl"))
+    fabric_shim_url: str = field(
+        default_factory=lambda: os.environ.get("ZTB_FABRIC_SHIM", "http://127.0.0.1:7071"))
     # Step-up challenges are valid this long; a retry after that is a fresh request.
     challenge_ttl_seconds: int = 300
     # Cloud mode only: the role the PDP assumes on the subject's behalf.

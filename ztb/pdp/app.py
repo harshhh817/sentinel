@@ -69,12 +69,46 @@ class PDP:
         self.verifier = Verifier.from_signer(self.signer)
         self.store = BaselineStore()
         self.chain = HashChain()
-        self.ledger = JsonlLedger(settings.ledger_path)
-        self.chain.rebuild(self.ledger.read_all())          # resume heads after restart
+        self.ledger = self._make_ledger(settings)
+        try:
+            self.chain.rebuild(self.ledger.read_all())      # resume heads after restart
+        except Exception:  # noqa: BLE001 - fabric exposes no read_all; heads start fresh
+            pass
         self.queue = LedgerQueue(self.ledger)
         key = EvidenceStore.load_or_create_key(settings.keys_dir / "evidence.key")
         self.evidence = EvidenceStore(settings.evidence_path, key)
         self.alpha = engine.alpha if engine else settings.alpha
+
+    def _make_ledger(self, settings: Settings):
+        if settings.ledger == "jsonl":
+            return JsonlLedger(settings.ledger_path)
+        if settings.ledger == "sim":
+            from ztb.ledger.sim import SimLedger
+
+            return SimLedger(self.verifier, settings.state_dir / "ledger" / "sim_journal.jsonl")
+        if settings.ledger == "fabric":
+            from ztb.ledger.client import FabricLedger
+
+            ledger = FabricLedger(settings.fabric_shim_url)
+            try:
+                ledger.set_pdp_public_key(self.signer.public_pem().decode())
+            except Exception:  # noqa: BLE001 - already set on this channel
+                pass
+            return ledger
+        raise ValueError(f"unknown ledger backend {settings.ledger!r}")
+
+    def ledger_verify(self, principal: str) -> dict[str, Any]:
+        """VerifyChain on the backend if it has one, else recompute from its records."""
+        if hasattr(self.ledger, "verify_chain"):
+            out = self.ledger.verify_chain(principal)
+            return {"principal": principal, "records": out.get("records", 0),
+                    "intact": out.get("intact"),
+                    "first_discontinuity": out.get("firstDiscontinuity", -1),
+                    "backend": self.settings.ledger}
+        recs = self.ledger.by_principal(principal)
+        first_bad = verify_chain(recs, self.verifier)
+        return {"principal": principal, "records": len(recs), "intact": first_bad == -1,
+                "first_discontinuity": first_bad, "backend": self.settings.ledger}
 
     # --- step-up challenges (line 8) ------------------------------------------
 
@@ -208,7 +242,9 @@ def create_app(settings: Settings | None = None, engine: RiskEngine | None = Non
     async def health() -> dict[str, Any]:
         pdp: PDP = app.state.pdp
         return {"status": "ok", "mode": settings.mode, "alpha": pdp.alpha,
+                "ledger": settings.ledger,
                 "principals_seen": len(pdp.store), "ledger_committed": pdp.queue.committed,
+                "ledger_rejected": pdp.queue.rejected, "ledger_failed": pdp.queue.failed,
                 "ledger_pending": pdp.queue.pending}
 
     @app.get("/records/{principal}")
@@ -221,12 +257,10 @@ def create_app(settings: Settings | None = None, engine: RiskEngine | None = Non
     async def verify(principal: str) -> dict[str, Any]:
         pdp: PDP = app.state.pdp
         await pdp.queue.flush()
-        recs = pdp.ledger.by_principal(principal)
-        if not recs:
+        out = pdp.ledger_verify(principal)
+        if not out["records"]:
             raise HTTPException(404, f"no records for {principal}")
-        first_bad = verify_chain(recs, pdp.verifier)
-        return {"principal": principal, "records": len(recs), "intact": first_bad == -1,
-                "first_discontinuity": first_bad}
+        return out
 
     @app.get("/public-key")
     async def public_key() -> dict[str, str]:

@@ -56,6 +56,8 @@ class LedgerQueue:
         self._task: asyncio.Task | None = None
         self.committed = 0
         self.failed = 0
+        self.rejected = 0            # endorsement rejections (LedgerRejected)
+        self.last_error: str | None = None
 
     def enqueue(self, record: dict[str, Any]) -> None:
         self._q.put_nowait(record)
@@ -70,8 +72,14 @@ class LedgerQueue:
             try:
                 await asyncio.to_thread(self.sink.commit, rec)
                 self.committed += 1
-            except Exception:  # noqa: BLE001 - the committer must never die
-                self.failed += 1
+            except Exception as e:  # noqa: BLE001 - the committer must never die
+                from ztb.ledger.sim import LedgerRejected
+
+                if isinstance(e, LedgerRejected):
+                    self.rejected += 1
+                else:
+                    self.failed += 1
+                self.last_error = str(e)
             finally:
                 self._q.task_done()
 

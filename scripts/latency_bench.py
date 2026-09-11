@@ -50,11 +50,11 @@ def synthetic_request(rng: random.Random, i: int) -> dict:
 
 
 async def run(models: Path, n: int, rps: float, seed: int, policy: Path | None,
-              state_dir: Path) -> tuple[list[dict], dict]:
+              state_dir: Path, ledger: str = "jsonl") -> tuple[list[dict], dict]:
     import httpx
 
     state_dir.mkdir(parents=True, exist_ok=True)
-    settings = Settings(models_dir=models, state_dir=state_dir)
+    settings = Settings(models_dir=models, state_dir=state_dir, ledger=ledger)
     if policy:
         settings.policy_path = policy
     # Every synthetic principal belongs to "sales" so the own-bucket condition passes.
@@ -86,9 +86,10 @@ async def run(models: Path, n: int, rps: float, seed: int, policy: Path | None,
             elapsed = time.perf_counter() - t_start
         await app.state.pdp.queue.flush()
         committed = app.state.pdp.queue.committed
+        rejected = app.state.pdp.queue.rejected
     return timings, {"requests": n, "target_rps": rps, "achieved_rps": round(n / elapsed, 1),
-                     "elapsed_s": round(elapsed, 1), "verdicts": verdicts,
-                     "ledger_committed": committed}
+                     "elapsed_s": round(elapsed, 1), "verdicts": verdicts, "ledger": ledger,
+                     "ledger_committed": committed, "ledger_rejected": rejected}
 
 
 def summarise(timings: list[dict]) -> list[dict]:
@@ -111,10 +112,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--policy", type=Path, default=None)
     ap.add_argument("--state-dir", type=Path, default=None,
                     help="scratch dir for keys/ledger/evidence (default: a temp dir)")
+    ap.add_argument("--ledger", choices=["jsonl", "sim", "fabric"], default="jsonl")
     a = ap.parse_args(argv)
 
     state = a.state_dir or Path(tempfile.mkdtemp(prefix="ztb-bench-"))
-    timings, meta = asyncio.run(run(a.models, a.n, a.rps, a.seed, a.policy, state))
+    timings, meta = asyncio.run(run(a.models, a.n, a.rps, a.seed, a.policy, state, a.ledger))
     rows = summarise(timings)
     a.out.mkdir(parents=True, exist_ok=True)
     with (a.out / "fig5.csv").open("w", newline="") as fh:

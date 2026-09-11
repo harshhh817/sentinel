@@ -1,0 +1,179 @@
+{
+ "pdp_public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE3IL7/C2N8b1G137w61VSuWs6Hy3h\nzJKMc5T4vrm8kU7L4Vfq42seQTDkR15mXVGx4EOyDaTjD9L3jrsxjjZcgg==\n-----END PUBLIC KEY-----\n",
+ "chain": [
+  {
+   "record": {
+    "recId": "id-u1-1",
+    "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "seq": 1,
+    "ts": "2026-09-11T10:00:00+00:00",
+    "principal": "u1",
+    "action": "s3:GetObject",
+    "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+    "r": 0.123456789,
+    "R": 0.30000000000000004,
+    "verdict": "ALLOW",
+    "h_feat": "abababababababababababababababababababababababababababababababab",
+    "sig": "MEUCICMaV0G5kUmMFoBQ1CY6pr6EIVPWgh/sc2fhCWVca4FxAiEAlOE3pyhOt8GVdJplvLwhMVTR1hjKZY761dSJu3uUDnQ="
+   },
+   "canonical": "{\"R\":0.3,\"action\":\"s3:GetObject\",\"h_feat\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"principal\":\"u1\",\"r\":0.12345679,\"recId\":\"id-u1-1\",\"resource\":\"arn:aws:s3:::ztb-sales/docs/q3.pdf\",\"seq\":1,\"ts\":\"2026-09-11T10:00:00+00:00\",\"verdict\":\"ALLOW\"}",
+   "record_hash": "da7a818779d664279ed8be7cbf0402aa8a8053cf322fb96746df192bb13f099e"
+  },
+  {
+   "record": {
+    "recId": "id-u1-2",
+    "prevHash": "da7a818779d664279ed8be7cbf0402aa8a8053cf322fb96746df192bb13f099e",
+    "seq": 2,
+    "ts": "2026-09-11T10:00:00+00:00",
+    "principal": "u1",
+    "action": "s3:GetObject",
+    "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+    "r": 0.123456789,
+    "R": 0.30000000000000004,
+    "verdict": "ALLOW",
+    "h_feat": "abababababababababababababababababababababababababababababababab",
+    "sig": "MEUCIQC48s62FKhSnRNvDuvWgnOC8K631Tpg0BFCu7sRqu8ymAIgeLKVDrMhfUoFXblJRDCCRxwgiI4saJg92Ud6laDwjjI="
+   },
+   "canonical": "{\"R\":0.3,\"action\":\"s3:GetObject\",\"h_feat\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"da7a818779d664279ed8be7cbf0402aa8a8053cf322fb96746df192bb13f099e\",\"principal\":\"u1\",\"r\":0.12345679,\"recId\":\"id-u1-2\",\"resource\":\"arn:aws:s3:::ztb-sales/docs/q3.pdf\",\"seq\":2,\"ts\":\"2026-09-11T10:00:00+00:00\",\"verdict\":\"ALLOW\"}",
+   "record_hash": "00c490c9467972143c288e4f408debef943e62aec1297fe697a2c358c97de940"
+  },
+  {
+   "record": {
+    "recId": "id-u1-3",
+    "prevHash": "00c490c9467972143c288e4f408debef943e62aec1297fe697a2c358c97de940",
+    "seq": 3,
+    "ts": "2026-09-11T10:00:00+00:00",
+    "principal": "u1",
+    "action": "s3:GetObject",
+    "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+    "r": 0.123456789,
+    "R": 0.30000000000000004,
+    "verdict": "ALLOW",
+    "h_feat": "abababababababababababababababababababababababababababababababab",
+    "sig": "MEYCIQDux3uDxXkShts1ep70r5vwjQTAdHy+wQi4j3X1AvMa2AIhAIXu52JlXs7GOCbltMW7hEObr9zMNrAN/JZ+Vzu7n/wk"
+   },
+   "canonical": "{\"R\":0.3,\"action\":\"s3:GetObject\",\"h_feat\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"00c490c9467972143c288e4f408debef943e62aec1297fe697a2c358c97de940\",\"principal\":\"u1\",\"r\":0.12345679,\"recId\":\"id-u1-3\",\"resource\":\"arn:aws:s3:::ztb-sales/docs/q3.pdf\",\"seq\":3,\"ts\":\"2026-09-11T10:00:00+00:00\",\"verdict\":\"ALLOW\"}",
+   "record_hash": "c7f2d0cd8f92817f9422b5532a9e9c66d6bf14e9cac7d4b97586c06929ee328a"
+  },
+  {
+   "record": {
+    "recId": "id-u1-4",
+    "prevHash": "c7f2d0cd8f92817f9422b5532a9e9c66d6bf14e9cac7d4b97586c06929ee328a",
+    "seq": 4,
+    "ts": "2026-09-11T10:00:00+00:00",
+    "principal": "u1",
+    "action": "s3:GetObject",
+    "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+    "r": 0.123456789,
+    "R": 0.30000000000000004,
+    "verdict": "ALLOW",
+    "h_feat": "abababababababababababababababababababababababababababababababab",
+    "sig": "MEQCIFo1vDKrq8b0ANgdoG+197uuW6G6bN5P3U4mrI5vKMJqAiAUF6CXWzMdFsHZJaEZevpxsmLIQ8MjRziXKPSOLCTiDA=="
+   },
+   "canonical": "{\"R\":0.3,\"action\":\"s3:GetObject\",\"h_feat\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"c7f2d0cd8f92817f9422b5532a9e9c66d6bf14e9cac7d4b97586c06929ee328a\",\"principal\":\"u1\",\"r\":0.12345679,\"recId\":\"id-u1-4\",\"resource\":\"arn:aws:s3:::ztb-sales/docs/q3.pdf\",\"seq\":4,\"ts\":\"2026-09-11T10:00:00+00:00\",\"verdict\":\"ALLOW\"}",
+   "record_hash": "198b30577a9a1c8a765e168efaa59d866a3baf049ca618397515ebac32ca53c4"
+  },
+  {
+   "record": {
+    "recId": "id-u1-5",
+    "prevHash": "198b30577a9a1c8a765e168efaa59d866a3baf049ca618397515ebac32ca53c4",
+    "seq": 5,
+    "ts": "2026-09-11T10:00:00+00:00",
+    "principal": "u1",
+    "action": "s3:GetObject",
+    "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+    "r": 0.123456789,
+    "R": 0.30000000000000004,
+    "verdict": "ALLOW",
+    "h_feat": "abababababababababababababababababababababababababababababababab",
+    "sig": "MEYCIQCiwBcNlx6ZzUJrNynmAJji+Q5xzFdSwhJQRfYZo+JYxQIhAKlXvKlfsErSO7U4urLFbDUXFeSny5uDyQJSywrCKLQV"
+   },
+   "canonical": "{\"R\":0.3,\"action\":\"s3:GetObject\",\"h_feat\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"198b30577a9a1c8a765e168efaa59d866a3baf049ca618397515ebac32ca53c4\",\"principal\":\"u1\",\"r\":0.12345679,\"recId\":\"id-u1-5\",\"resource\":\"arn:aws:s3:::ztb-sales/docs/q3.pdf\",\"seq\":5,\"ts\":\"2026-09-11T10:00:00+00:00\",\"verdict\":\"ALLOW\"}",
+   "record_hash": "06c3cac75eab25f59b62be1f07a557483f34fdde50e6dd9d6bb1cfdaaa71ef8d"
+  }
+ ],
+ "edge": [
+  {
+   "record": {
+    "recId": "id-u1-1",
+    "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "seq": 1,
+    "ts": "2026-09-11T10:00:00+00:00",
+    "principal": "u1",
+    "action": "s3:GetObject",
+    "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+    "r": 0.0,
+    "R": 1.0,
+    "verdict": "ALLOW",
+    "h_feat": "abababababababababababababababababababababababababababababababab",
+    "sig": "MEUCIGB7wBvmsG1sgci4Xg64uW4O64xUMhtaj1W7prgWfEFmAiEAu0dhaNMyHBwVCXJca71AvftX2fHFQS3Ft0nEFcOpJ2Y="
+   },
+   "canonical": "{\"R\":1.0,\"action\":\"s3:GetObject\",\"h_feat\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"principal\":\"u1\",\"r\":0.0,\"recId\":\"id-u1-1\",\"resource\":\"arn:aws:s3:::ztb-sales/docs/q3.pdf\",\"seq\":1,\"ts\":\"2026-09-11T10:00:00+00:00\",\"verdict\":\"ALLOW\"}"
+  },
+  {
+   "record": {
+    "recId": "id-u1-1",
+    "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "seq": 1,
+    "ts": "2026-09-11T10:00:00+00:00",
+    "principal": "u1",
+    "action": "s3:GetObject",
+    "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+    "r": 1e-05,
+    "R": 0.5,
+    "verdict": "ALLOW",
+    "h_feat": "abababababababababababababababababababababababababababababababab",
+    "sig": "MEYCIQDd7PvSR/VoQXKRYlNPDhk64HoT8lPtX3aKaf48BcdE5gIhAPmHMqLwnp7Mw8I+UspCp1S93lll9HNTaJewZPPcwgXW"
+   },
+   "canonical": "{\"R\":0.5,\"action\":\"s3:GetObject\",\"h_feat\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"principal\":\"u1\",\"r\":1e-05,\"recId\":\"id-u1-1\",\"resource\":\"arn:aws:s3:::ztb-sales/docs/q3.pdf\",\"seq\":1,\"ts\":\"2026-09-11T10:00:00+00:00\",\"verdict\":\"ALLOW\"}"
+  },
+  {
+   "record": {
+    "recId": "id-u1-1",
+    "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "seq": 1,
+    "ts": "2026-09-11T10:00:00+00:00",
+    "principal": "u1",
+    "action": "s3:GetObject",
+    "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+    "r": null,
+    "R": null,
+    "verdict": "DENY",
+    "h_feat": "abababababababababababababababababababababababababababababababab",
+    "sig": "MEQCIFPTGDJiiEgMV3NDst4c7939M5x9Z9PeUhMOVys1jfQgAiAWLZ7wwhXa8Ugs7fduEQqoJ5IruwwjUQ24YWW7gxWXgQ=="
+   },
+   "canonical": "{\"R\":null,\"action\":\"s3:GetObject\",\"h_feat\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"principal\":\"u1\",\"r\":null,\"recId\":\"id-u1-1\",\"resource\":\"arn:aws:s3:::ztb-sales/docs/q3.pdf\",\"seq\":1,\"ts\":\"2026-09-11T10:00:00+00:00\",\"verdict\":\"DENY\"}"
+  },
+  {
+   "record": {
+    "recId": "id-u1-1",
+    "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "seq": 1,
+    "ts": "2026-09-11T10:00:00+00:00",
+    "principal": "u1",
+    "action": "s3:GetObject",
+    "resource": "arn:aws:s3:::b/\"quoted\" & <x> caf\u00e9",
+    "r": 0.123456789,
+    "R": 0.30000000000000004,
+    "verdict": "ALLOW",
+    "h_feat": "abababababababababababababababababababababababababababababababab",
+    "sig": "MEQCIEgeY2gTpFZnGt+QXDL8ovio/P/RiFRyiLRseeQTT/BuAiBwWvKnlpoen2WdjpBtwOye/h3r6HcjxjohvSCie4X4lQ=="
+   },
+   "canonical": "{\"R\":0.3,\"action\":\"s3:GetObject\",\"h_feat\":\"abababababababababababababababababababababababababababababababab\",\"prevHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"principal\":\"u1\",\"r\":0.12345679,\"recId\":\"id-u1-1\",\"resource\":\"arn:aws:s3:::b/\\\"quoted\\\" & <x> caf\\u00e9\",\"seq\":1,\"ts\":\"2026-09-11T10:00:00+00:00\",\"verdict\":\"ALLOW\"}"
+  }
+ ],
+ "foreign_signer_record": {
+  "recId": "id-u1-1",
+  "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "seq": 1,
+  "ts": "2026-09-11T10:00:00+00:00",
+  "principal": "u1",
+  "action": "s3:GetObject",
+  "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+  "r": 0.123456789,
+  "R": 0.30000000000000004,
+  "verdict": "ALLOW",
+  "h_feat": "abababababababababababababababababababababababababababababababab",
+  "sig": "MEUCIGiVkJ0a52uwavZ/hhQbVYRFsqz6ELmvQuMl5EnpPK1XAiEAuHxhGovOeUwLG39R+fxx/8lE+dsElcqzqqFccQnpVYM="
+ }
+}
