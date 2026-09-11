@@ -247,6 +247,34 @@ untouched):
 The detectors catch gross off-manifold behaviour exactly as intended. The scripted CERT scenarios
 are not off-manifold at event level in this feature space.
 
+**User-day granularity (`results/userday/`, `scripts/userday.py`).** Each (principal, day)
+becomes one 75-dim vector — log event count, after-hours fraction, per-feature mean and max, log
+counts of the rare flags — and the same autoencoder + forest is trained on benign user-days. With
+the training window on the unplugged disk, the validation window was split by day: its first half
+trains (19,522 user-days, 94 positive — labels used only by the supervised rows), its second half
+calibrates (16,741); the test window is untouched (83,986 user-days, 240 positive). Five seeds.
+
+| Model | user-day AUC | user-day F1 @ R≥0.85 | user-day tuned F1 |
+|---|---:|---:|---:|
+| Logistic regression † | **0.954** | 0.102 | 0.077 |
+| Random forest † | **0.911** | 0.105 | 0.119 |
+| Isolation forest | 0.791 | 0.013 | 0.002 |
+| Deep autoencoder | 0.545 | 0.006 | 0.008 |
+| Proposed hybrid | 0.800 | 0.006 | 0.005 |
+
+Propagated back to requests as r′ = max(request r, the principal's current-day r), on the same
+4 M-row test sample (`table_v_propagated.csv`): request-only AUC 0.748 →
+user-day-only 0.788 → propagated **0.799**. Aggregation is where the
+unsupervised signal lives: the forest reaches 0.79 on user-days against 0.47–0.57 on events, the
+autoencoder stays near chance, and the hybrid ends at 0.80 at both granularities.
+
+**Operating configuration.** Nothing unsupervised reaches AUC 0.85. The configurations that do are
+**supervised at user-day granularity**: logistic regression 0.954 and random forest
+0.911 on the 75-dim user-day vector. That is the configuration the PDP demo should
+use for its risk score, with the caveat that it is trained with scenario labels (from the
+validation window's first half here; from `train_malicious` once the training window is back)
+and therefore reflects the paper's supervised baselines rather than its unsupervised design.
+
 Conclusion for the write-up: on CERT r4.2 replayed at event level, the paper's unsupervised
 design — reconstruction and isolation over a per-request behavioural vector — does not separate
 the scripted scenarios from normal activity, in any of the three configurations, while a
