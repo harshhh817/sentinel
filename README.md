@@ -231,6 +231,22 @@ test sample, 947 positives):
   fused per type) recover a little forest signal (0.57) but the autoencoder stays *below* 0.5:
   within their type, malicious rows reconstruct slightly *better* than benign ones. Hybrid 0.53.
 
+**Sanity check (`results/sanity_injection.csv`, `scripts/sanity_inject.py`).** Before concluding
+"design problem", the pipeline was checked with synthetic anomalies injected into the validation
+window and scored by the trained global engine (seed 0, 20,000 perturbed benign rows vs 200,000
+untouched):
+
+| Injection | AE AUC | forest AUC | hybrid AUC | injected rows at r ≥ 0.85 |
+|---|---:|---:|---:|---:|
+| 3 AM removable-media event at 50× volume | 1.000 | 0.977 | 0.997 | 100 % |
+| 50× volume only | 1.000 | 0.955 | 0.992 | 100 % |
+| novel host + first-time action | 0.997 | 0.863 | 0.956 | 100 % |
+| 3 AM only | 0.807 | 0.792 | 0.813 | 26 % |
+| Gaussian noise, 3σ | 1.000 | 0.991 | 0.999 | 100 % |
+
+The detectors catch gross off-manifold behaviour exactly as intended. The scripted CERT scenarios
+are not off-manifold at event level in this feature space.
+
 Conclusion for the write-up: on CERT r4.2 replayed at event level, the paper's unsupervised
 design — reconstruction and isolation over a per-request behavioural vector — does not separate
 the scripted scenarios from normal activity, in any of the three configurations, while a

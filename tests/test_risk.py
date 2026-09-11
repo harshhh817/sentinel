@@ -350,3 +350,39 @@ def test_evaluate_and_compare_across_variants(trained, synth, tmp_path):
     rows = (res / "table_v_variants.csv").read_text().splitlines()
     assert rows[0].startswith("model,global:auc") and "per_source_calibration:auc" in rows[0]
     assert len(rows) == 6
+
+
+# --- user-day aggregation ------------------------------------------------------
+
+
+def test_userday_aggregation_counts_means_maxes_and_labels(synth, tmp_path):
+    import pyarrow.parquet as pq
+
+    from ztb.risk.userday import N_USERDAY, USERDAY_FEATURES, aggregate, load, save
+
+    path = synth["out_dir"] / "test.parquet"
+    ud = aggregate(path)
+    assert ud.x.shape == (len(ud), N_USERDAY) and len(USERDAY_FEATURES) == N_USERDAY
+    assert np.isfinite(ud.x).all()
+    # Reconcile against a pandas groupby on the same file.
+    t = pq.read_table(path, columns=["principal", "ts", "label", "calls_60min"]).to_pandas()
+    t["day"] = t["ts"].dt.strftime("%Y-%m-%d")
+    g = t.groupby(["principal", "day"])
+    ref_n = g.size()
+    ref_max = g["calls_60min"].max()
+    ref_lab = g["label"].max()
+    k2i = ud.key_to_index()
+    assert len(k2i) == len(ref_n)
+    i_max = USERDAY_FEATURES.index("max_calls_60min")
+    i_mean = USERDAY_FEATURES.index("mean_calls_60min")
+    for (p, d), n in ref_n.items():
+        i = k2i[(p, d)]
+        assert ud.n_events[i] == n
+        assert ud.x[i, i_max] == pytest.approx(ref_max[(p, d)], rel=1e-5)
+        assert ud.x[i, i_mean] == pytest.approx(g["calls_60min"].mean()[(p, d)], rel=1e-4)
+        assert ud.y[i] == ref_lab[(p, d)]
+    assert ud.y.sum() > 0                                   # some malicious user-days
+    save(ud, tmp_path / "ud.parquet")
+    back = load(tmp_path / "ud.parquet")
+    np.testing.assert_allclose(back.x, ud.x)
+    assert list(back.principal) == list(ud.principal) and (back.y == ud.y).all()
