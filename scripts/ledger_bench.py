@@ -38,14 +38,18 @@ from ztb.pdp.signer import Signer, Verifier  # noqa: E402
 class Principals:
     """Per-principal chain heads shared by the submitters (what the PDP tracks)."""
 
+    TAG = datetime.now().strftime("%H%M%S")      # unique principals per run on a reused channel
+
     def __init__(self, signer: Signer, n: int, offset: int = 0):
         self.signer = signer
-        self.heads = {f"B{offset + i:05d}": (0, GENESIS) for i in range(n)}
+        self.heads = {f"B{self.TAG}-{offset + i:05d}": (0, GENESIS) for i in range(n)}
         self.lock = threading.Lock()
 
-    def next_record(self, rng: random.Random) -> dict:
+    def next_record(self, rng: random.Random, owned: list[str] | None = None) -> dict:
+        """Next record for one of ``owned`` principals (a worker's disjoint share), so no
+        two in-flight submissions carry consecutive seqs of the same chain."""
         with self.lock:
-            p = rng.choice(list(self.heads))
+            p = rng.choice(owned or list(self.heads))
             seq, prev = self.heads[p]
             rec = make_record(self.signer, p, seq + 1, prev, datetime.now(UTC))
             self.heads[p] = (seq + 1, record_hash(rec))
@@ -60,9 +64,12 @@ def run_rate(ledger, principals: Principals, rate: float, seconds: float, worker
     lock = threading.Lock()
     stop = time.perf_counter() + seconds
 
+    names = list(principals.heads)
+
     def worker(k: int):
         nonlocal committed, rejected, failed
         rng = random.Random(seed * 1000 + k)
+        owned = names[k::workers]                 # disjoint principals per worker
         nxt = time.perf_counter() + k * interval / workers
         while True:
             now = time.perf_counter()
@@ -72,7 +79,7 @@ def run_rate(ledger, principals: Principals, rate: float, seconds: float, worker
                 time.sleep(min(nxt - now, 0.005))
                 continue
             nxt += interval
-            rec = principals.next_record(rng)
+            rec = principals.next_record(rng, owned)
             t0 = time.perf_counter()
             try:
                 ledger.commit(rec)

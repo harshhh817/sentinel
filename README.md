@@ -391,13 +391,36 @@ ledger, plus 10,000 untampered control records:
 | tampering attempts detected | 0 / 500 | **500 / 500** |
 | false alarms over clean records | — | **0 / 10000** |
 
-Modification and fabrication are rejected at `LogAccess` (signature); deletion, including of a
-chain's tail, is caught by `VerifyChain`. **This Table VII was produced against
-`ztb/ledger/sim.py`, a Python reference implementation of exactly the chaincode's rules
-(`ledger=sim` in the CSV), because Docker is not installed on the development machine.** The Go
-chaincode enforces the same rules and is unit-tested against the same signatures; re-running
-with `--ledger fabric` on the test-network is a one-command step once Docker is present. Fig. 6
-(throughput vs offered load) is only meaningful on the live network and has not been produced.
+**These are live-network numbers** (`ledger=fabric` in the CSV): a two-organisation
+fabric-samples test-network with CouchDB, the chaincode deployed as a service, records committed
+through the Fabric Gateway. Fabrication is rejected at `LogAccess` (endorsement fails on the
+signature); deletion, verdict edits and backdating were applied *directly to the endorsing peer's
+CouchDB* — the privileged-manipulator move — and every one is caught by `VerifyChain`, including
+deletion of a chain's last record (the head check). The same experiment against the Python
+reference ledger, run before the network existed, is kept under `results/sim/` and agrees
+(500/500, 0/10,000).
+
+**Fig. 6 (`results/fig6.csv`, live network).** Offered load vs committed throughput and commit
+latency, 32 concurrent submitters for 20 s per rate, 200 fresh principals per rate:
+
+| Offered tx/s | Committed tx/s | commit p50 | commit p95 |
+|---:|---:|---:|---:|
+| 25 | 24.9 | 307.5 ms | 488.3 ms |
+| 50 | 49.6 | 245.1 ms | 505.6 ms |
+| 100 | 53.8 | 516.4 ms | 753.3 ms |
+| 200 | 50.3 | 563.0 ms | 799.9 ms |
+| 300 | 50.5 | 549.5 ms | 811.9 ms |
+
+The network tracks offered load to 50 tx/s and saturates at about 50 tx/s (paper: ~450 tx/s on
+nine t3.medium hosts with a three-node Raft orderer; this is one laptop running two peers, one
+orderer and two CouchDBs under Docker Desktop with default 2 s batch timeout). Ledger commitment
+stays off the authorisation path either way.
+
+Deployment notes that cost real time: Fabric 2.5's in-peer chaincode build does not work with
+current Docker Desktop engines (empty build log, broken pipe), so the chaincode runs as a service
+(`chaincode/README.md`); `contractapi` rejects pointer fields in returned structs and treats
+every field as required unless tagged `metadata:",optional"`; sequential Gateway submits commit
+at ~0.3 tx/s because each waits for its block, so the experiment commits chains in parallel.
 
 ## Notes
 
