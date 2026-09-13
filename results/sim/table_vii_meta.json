@@ -1,0 +1,8 @@
+{
+  "ledger": "sim",
+  "attempts": 500,
+  "per_kind": 125,
+  "control_records": 10000,
+  "control_alarms": 0,
+  "honest_records": 1000
+}

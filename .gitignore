@@ -45,3 +45,6 @@ fabric-samples/
 .DS_Store
 .idea/
 .vscode/
+
+# compiled chaincode binary (go build ./... in the main package)
+chaincode/auditcontract/auditcontract

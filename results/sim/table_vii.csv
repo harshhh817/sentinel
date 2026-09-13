@@ -1,0 +1,15 @@
+metric,value,ledger
+delete: succeeded against JSONL log,125 / 125,jsonl
+delete: self-evident in JSONL log,0 / 125,jsonl
+delete: detected on ledger,125 / 125,sim
+modify: succeeded against JSONL log,125 / 125,jsonl
+modify: self-evident in JSONL log,0 / 125,jsonl
+modify: detected on ledger,125 / 125,sim
+backdate: succeeded against JSONL log,125 / 125,jsonl
+backdate: self-evident in JSONL log,0 / 125,jsonl
+backdate: detected on ledger,125 / 125,sim
+fabricate: succeeded against JSONL log,125 / 125,jsonl
+fabricate: self-evident in JSONL log,0 / 125,jsonl
+fabricate: detected on ledger,125 / 125,sim
+Tampering attempts detected,500 / 500,sim
+False alarms over clean records,0 / 10000,sim
