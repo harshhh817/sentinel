@@ -115,10 +115,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--principals", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--keys-dir", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=RESULTS)
     a = ap.parse_args(argv)
 
-    pdp = Signer.generate()
+    pdp = Signer.load_or_create(a.keys_dir) if a.keys_dir else Signer.generate()
     if a.ledger == "sim":
         ledger = SimLedger(Verifier.from_signer(pdp))
     else:
@@ -128,7 +129,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             ledger.set_pdp_public_key(pdp.public_pem().decode())
         except Exception as e:  # noqa: BLE001
-            raise SystemExit(f"cannot install the PDP key (fresh channel needed): {e}") from e
+            if "already set" not in str(e) or not a.keys_dir:
+                raise SystemExit(f"cannot install the PDP key: {e}") from e
     rows = []
     for i, rate in enumerate(a.rates):
         principals = Principals(pdp, a.principals, offset=i * a.principals)

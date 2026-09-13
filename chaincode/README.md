@@ -26,14 +26,25 @@ cd ~ && curl -sSL https://raw.githubusercontent.com/hyperledger/fabric/main/scri
 
 ## Bring up a 2-org network with CouchDB and deploy
 
+The chaincode is deployed **as a service** (CCaaS): the image is built on the host from the
+`Dockerfile` (vendored modules, `go mod vendor`) and each peer connects to a running container.
+Fabric 2.5's classic `deployCC` path builds the image *inside* the peer through the host Docker
+socket with a legacy API, and current Docker Desktop engines (29.x) drop that connection with an
+empty build log; CCaaS avoids the in-peer build entirely.
+
 ```bash
 cd ~/fabric-samples/test-network
 ./network.sh down
 ./network.sh up createChannel -c mychannel -ca -s couchdb
-./network.sh deployCC -c mychannel -ccn auditcontract \
-    -ccp /Users/harshgupta/projects/ztbaudit/chaincode/auditcontract -ccl go \
-    -ccep "OR('Org1MSP.peer','Org2MSP.peer')"
+docker build -t auditcontract_ccaas_image:latest /Users/harshgupta/projects/ztbaudit/chaincode/auditcontract
+./network.sh deployCCAAS -c mychannel -ccn auditcontract \
+    -ccp /Users/harshgupta/projects/ztbaudit/chaincode/auditcontract \
+    -ccep "OR('Org1MSP.peer','Org2MSP.peer')"          # add -ccs N to redeploy a new image
 ```
+
+`main()` starts a `shim.ChaincodeServer` when `CHAINCODE_SERVER_ADDRESS` is set (deployCCAAS
+passes it together with `CHAINCODE_ID`). Note for anyone extending the record: `contractapi`
+rejects pointer fields in returned structs, which is why the nullable `r`/`R` are `any`.
 
 `-s couchdb` is required for `QueryByResource` (a rich query; the index ships in
 `META-INF/statedb/couchdb/indexes/`). `QueryByPrincipal` and `VerifyChain` use a composite key
@@ -54,18 +65,24 @@ once per channel, so a new PDP key means a fresh channel (or redeploying the cha
 ## Experiments
 
 ```bash
-python scripts/tamper_test.py --ledger fabric --out results      # Table VII
-python scripts/ledger_bench.py --ledger fabric --out results     # Fig. 6
+python scripts/tamper_test.py  --ledger fabric --keys-dir state/keys \
+    --couchdb http://admin:adminpw@localhost:5984/mychannel_auditcontract --out results   # Table VII
+python scripts/ledger_bench.py --ledger fabric --keys-dir state/keys --out results         # Fig. 6
 ```
+
+`--keys-dir` persists the PDP key so both scripts share one channel (the chaincode accepts the
+key once). `--couchdb` is how the tamper experiment models A3 on a live network: it edits and
+deletes the endorsing peer's CouchDB documents directly, behind the chaincode's back, so
+`VerifyChain` has to catch it from the state alone. Commits are parallelised across principals
+(each chain stays in order) because every Gateway submit waits ~2 s for block commit.
 
 Without Docker, `--ledger sim` runs both against `ztb/ledger/sim.py`, a Python reference
 implementation of exactly the chaincode's rules; its Table VII is labelled `ledger=sim` and its
 throughput must not be reported as ledger throughput.
 
-Against a real Fabric network the tamper experiment's "direct state edit" is modelled as
-suppression plus resubmission: the world state is writable only through endorsed transactions,
-so an administrator would have to edit CouchDB on every endorsing peer; edited records are
-resubmitted through `LogAccess` and rejected, deletions are detected by `VerifyChain`.
+Fabricated records go through `LogAccess` and are rejected at endorsement; deletions,
+verdict edits and backdating are applied straight to the peer's CouchDB and are detected by
+`VerifyChain` (a gap, or a signature that no longer verifies).
 
 ## Extending to three organisations (the paper's Table IV)
 

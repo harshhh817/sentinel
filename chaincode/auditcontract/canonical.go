@@ -10,6 +10,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -26,8 +27,8 @@ type AuditRecord struct {
 	Principal string   `json:"principal"`
 	Action    string   `json:"action"`
 	Resource  string   `json:"resource"`
-	R         *float64 `json:"r"`
-	RR        *float64 `json:"R"`
+	R         any      `json:"r"` // float64 or nil (static deny); contractapi forbids *float64
+	RR        any      `json:"R"`
 	Verdict   string   `json:"verdict"`
 	HFeat     string   `json:"h_feat"`
 	Sig       string   `json:"sig"`
@@ -88,11 +89,27 @@ func pyString(s string) string {
 	return b.String()
 }
 
-func pyFloatOrNull(v *float64) string {
-	if v == nil {
+func pyFloatOrNull(v any) string {
+	switch x := v.(type) {
+	case nil:
+		return "null"
+	case float64:
+		return pyRepr(x)
+	case float32:
+		return pyRepr(float64(x))
+	case int:
+		return pyRepr(float64(x))
+	case int64:
+		return pyRepr(float64(x))
+	case json.Number:
+		f, err := x.Float64()
+		if err != nil {
+			return "null"
+		}
+		return pyRepr(f)
+	default:
 		return "null"
 	}
-	return pyRepr(*v)
 }
 
 // Canonical returns the signed bytes: sorted keys, no whitespace.

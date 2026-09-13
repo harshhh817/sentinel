@@ -68,7 +68,7 @@ createServer(async (req, res) => {
     // Endorsement failures carry the chaincode's message; surface them as 422 so the
     // Python client can raise LedgerRejected instead of a transport error.
     const msg = e?.details?.map?.(d => d.message).join('; ') || e.message || String(e);
-    const status = e.status ?? (/duplicate|signature|discontinuity|prevHash|required|not set/i.test(msg) ? 422 : 500);
+    const status = e.status ?? (/duplicate|signature|discontinuity|prevHash|required|not set|already set/i.test(msg) ? 422 : 500);
     res.writeHead(status, { 'content-type': 'text/plain' }); res.end(msg);
   }
 }).listen(PORT, () => console.log(`ztb fabric shim on :${PORT} -> ${CHANNEL}/${CHAINCODE} via ${PEER}`));

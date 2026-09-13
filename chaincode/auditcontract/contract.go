@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"os"
 	"strconv"
 
+	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
@@ -263,6 +265,20 @@ func main() {
 	cc, err := contractapi.NewChaincode(&AuditContract{})
 	if err != nil {
 		panic(err)
+	}
+	// Chaincode-as-a-service: the peer connects to us. test-network's deployCCAAS sets
+	// CHAINCODE_SERVER_ADDRESS and CHAINCODE_ID (the package id).
+	if addr := os.Getenv("CHAINCODE_SERVER_ADDRESS"); addr != "" {
+		server := &shim.ChaincodeServer{
+			CCID:     os.Getenv("CHAINCODE_ID"),
+			Address:  addr,
+			CC:       cc,
+			TLSProps: shim.TLSProperties{Disabled: true},
+		}
+		if err := server.Start(); err != nil {
+			panic(err)
+		}
+		return
 	}
 	if err := cc.Start(); err != nil {
 		panic(err)

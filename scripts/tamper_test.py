@@ -51,12 +51,43 @@ def make_record(signer: Signer, principal: str, seq: int, prev: str, ts: datetim
     return rec
 
 
+RUN_TAG = datetime.now().strftime("%H%M%S")   # unique principals per run on a reused channel
+
+
+def commit_chains(ledger, records: list[dict], workers: int = 32) -> int:
+    """Commit records with per-principal ordering preserved, principals in parallel.
+
+    Each Fabric submit waits ~2 s for block commit, so sequential submission of ten
+    thousand records would take hours; chains are independent, so they run in parallel.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    by_p: dict[str, list[dict]] = {}
+    for r in records:
+        by_p.setdefault(r["principal"], []).append(r)
+    rejected = 0
+
+    def run_chain(chain: list[dict]) -> int:
+        bad = 0
+        for r in sorted(chain, key=lambda x: x["seq"]):
+            try:
+                ledger.commit(r)
+            except LedgerRejected:
+                bad += 1
+        return bad
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for bad in ex.map(run_chain, by_p.values()):
+            rejected += bad
+    return rejected
+
+
 def generate_chains(signer: Signer, principals: int, per_principal: int, rng: random.Random):
     """Honest PDP output: per-principal chains, interleaved in time."""
     t0 = datetime(2026, 9, 1, tzinfo=UTC)
     out = []
     for p in range(principals):
-        prev, principal = GENESIS, f"U{p:04d}"
+        prev, principal = GENESIS, f"U{RUN_TAG}-{p:04d}"
         for s in range(1, per_principal + 1):
             rec = make_record(signer, principal, s, prev,
                               t0 + timedelta(minutes=rng.randrange(60 * 24 * 30)))
@@ -84,10 +115,13 @@ class JsonlLog:
         self.records = [rec if r["recId"] == rec["recId"] else r for r in self.records]
 
 
-def run(ledger_kind: str, n_attempts: int, control: int, seed: int, shim_url: str | None):
+def run(ledger_kind: str, n_attempts: int, control: int, seed: int, shim_url: str | None,
+        keys_dir: Path | None = None):
     rng = random.Random(seed)
     random.seed(seed)
-    pdp = Signer.generate()
+    # A persisted key lets several scripts share one channel (the chaincode accepts the
+    # PDP key once); without it every run needs a fresh channel.
+    pdp = Signer.load_or_create(keys_dir) if keys_dir else Signer.generate()
     verifier = Verifier.from_signer(pdp)
     adversary = Signer.generate()
 
@@ -100,8 +134,8 @@ def run(ledger_kind: str, n_attempts: int, control: int, seed: int, shim_url: st
         try:
             ledger.set_pdp_public_key(pdp.public_pem().decode())
         except Exception as e:  # noqa: BLE001
-            raise SystemExit(f"cannot install the PDP key on the ledger "
-                             f"(a fresh channel is needed): {e}") from e
+            if "already set" not in str(e) or not keys_dir:
+                raise SystemExit(f"cannot install the PDP key on the ledger: {e}") from e
     else:
         raise SystemExit(f"unknown ledger {ledger_kind}")
     log = JsonlLog()
@@ -113,7 +147,8 @@ def run(ledger_kind: str, n_attempts: int, control: int, seed: int, shim_url: st
     history = generate_chains(pdp, principals, per_principal, rng)
     for rec in history:
         log.commit(rec)
-        ledger.commit(rec)
+    if commit_chains(ledger, history):
+        raise SystemExit("honest history was rejected by the ledger; is the channel fresh?")
 
     # --- 500 attempts
     rows = []
@@ -123,7 +158,7 @@ def run(ledger_kind: str, n_attempts: int, control: int, seed: int, shim_url: st
             if kind == "fabricate":
                 # a benign-looking record for a real principal, correct seq and prevHash,
                 # signed by the adversary
-                p = f"U{rng.randrange(principals):04d}"
+                p = f"U{RUN_TAG}-{rng.randrange(principals):04d}"
                 chain = log.by_principal(p)
                 rec = make_record(adversary, p, chain[-1]["seq"] + 1, record_hash(chain[-1]),
                                   datetime.now(UTC))
@@ -166,21 +201,20 @@ def run(ledger_kind: str, n_attempts: int, control: int, seed: int, shim_url: st
     ctrl_pdp = pdp
     t0 = datetime(2026, 10, 1, tzinfo=UTC)
     ctrl_principals = 100
-    alarms = 0
+    ctrl: list[dict] = []
     for p in range(ctrl_principals):
-        principal, prev = f"C{p:04d}", GENESIS
+        principal, prev = f"C{RUN_TAG}-{p:04d}", GENESIS
         for s in range(1, control // ctrl_principals + 1):
             rec = make_record(ctrl_pdp, principal, s, prev, t0 + timedelta(seconds=s))
-            try:
-                ledger.commit(rec)
-            except LedgerRejected:
-                alarms += 1
+            ctrl.append(rec)
             prev = record_hash(rec)
+    alarms = commit_chains(ledger, ctrl)               # any rejection of a clean record
+    for p in range(ctrl_principals):
+        principal = f"C{RUN_TAG}-{p:04d}"
         if not ledger.verify_chain(principal)["intact"]:
             alarms += 1
-    # also verify the Python-side chain check agrees on the clean control set
-    for p in range(ctrl_principals):
-        if verify_chain(ledger.by_principal(f"C{p:04d}"), verifier) != -1:
+        # the Python-side chain check must agree on the clean control set
+        if verify_chain(ledger.by_principal(principal), verifier) != -1:
             alarms += 1
 
     return rows, {"ledger": ledger_kind, "attempts": len(rows), "per_kind": per_attempt,
@@ -188,19 +222,51 @@ def run(ledger_kind: str, n_attempts: int, control: int, seed: int, shim_url: st
                   "honest_records": len(history)}
 
 
+COUCHDB = None   # set from --couchdb; e.g. http://admin:adminpw@localhost:5984/mychannel_auditcontract
+
+
 def _admin(ledger, op: str, rec: dict) -> None:
-    """A3's direct write to the peer's state database, bypassing the chaincode."""
+    """A3's direct write to the peer's state database, bypassing the chaincode.
+
+    Against Fabric this edits the endorsing peer's CouchDB document for ``rec/<recId>``
+    directly (test-network exposes couchdb0 with admin credentials), which is exactly
+    what a privileged log manipulator with host access would do; the chaincode never
+    sees it, and VerifyChain has to catch it from the state alone.
+    """
     if isinstance(ledger, SimLedger):
         if op == "delete":
             ledger._admin_delete(rec["recId"])
         else:
             ledger._admin_overwrite(rec["recId"], rec)
+        return
+    if not COUCHDB:
+        raise SystemExit("--couchdb is required for fabric-mode tampering "
+                         "(e.g. http://admin:adminpw@localhost:5984/mychannel_auditcontract)")
+    import base64
+    import urllib.parse
+    import urllib.request
+
+    # urllib does not accept user:pass@ in URLs; send basic auth as a header instead.
+    u = urllib.parse.urlsplit(COUCHDB)
+    headers = {"content-type": "application/json"}
+    if u.username:
+        token = base64.b64encode(f"{u.username}:{u.password or ''}".encode()).decode()
+        headers["Authorization"] = f"Basic {token}"
+    base = f"{u.scheme}://{u.hostname}:{u.port}{u.path}"
+    doc_url = f"{base}/{urllib.parse.quote('rec/' + rec['recId'], safe='')}"
+    with urllib.request.urlopen(urllib.request.Request(doc_url, headers=headers),
+                                timeout=10) as resp:
+        doc = json.loads(resp.read())
+    if op == "delete":
+        req = urllib.request.Request(f"{doc_url}?rev={doc['_rev']}", method="DELETE",
+                                     headers=headers)
     else:
-        # On a real Fabric network the world state is only writable through endorsed
-        # transactions; an administrator would have to edit CouchDB directly on every
-        # endorsing peer. The experiment therefore submits the edited record through
-        # LogAccess, where it is rejected, and models deletion as suppression.
-        raise NotImplementedError("direct state edits are not exposed by the Fabric shim")
+        body = dict(doc)
+        body.update({k: v for k, v in rec.items()})          # edited fields, same _id/_rev
+        req = urllib.request.Request(doc_url, data=json.dumps(body).encode(), method="PUT",
+                                     headers=headers)
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        resp.read()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -210,10 +276,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--control", type=int, default=10_000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--shim", default=None)
+    ap.add_argument("--keys-dir", type=Path, default=None,
+                    help="persisted PDP key (share one channel across scripts)")
+    ap.add_argument("--couchdb", default=None,
+                    help="fabric mode: the endorsing peer's state DB, for A3's direct edits")
     ap.add_argument("--out", type=Path, default=RESULTS)
     a = ap.parse_args(argv)
+    global COUCHDB
+    COUCHDB = a.couchdb
 
-    rows, meta = run(a.ledger, a.attempts, a.control, a.seed, a.shim)
+    rows, meta = run(a.ledger, a.attempts, a.control, a.seed, a.shim, a.keys_dir)
     by_kind = {}
     for r in rows:
         k = by_kind.setdefault(r["kind"], {"attempts": 0, "jsonl_succeeded": 0,
