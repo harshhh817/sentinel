@@ -53,14 +53,15 @@ def test_top_features_returns_three_named_contributions(tiny_art):
 
 
 def test_trails_sign_chain_and_cover_tracks_breaks_only_the_ledger():
-    trails = Trails(Signer.generate())
+    trails = Trails(Signer.generate(), backend="sim")
     ev = pd.Series({"ts": pd.Timestamp("2011-02-14 09:00:00"), "action": "s3:GetObject",
                     "resource": "arn:aws:s3:::ztb-x/removable/PC-1"})
     x = np.zeros(34, np.float32)
     for i in range(12):
         verdict = "DENY" if i % 3 == 0 else "ALLOW"
         trails.record("HBO0413", ev, 0.9 if verdict == "DENY" else 0.1, 0.9, verdict, x)
-    assert trails.verify("HBO0413")["intact"]
+    trails.flush()
+    assert trails.verify("HBO0413")["intact"] and trails.committed == 12
     assert all(p["verdict"] == "ALLOW" for p in trails.plain)      # plain IAM logs ALLOW
     actions = trails.cover_tracks("HBO0413", n_delete=2, n_modify=2)
     assert len(actions) == 4
@@ -89,3 +90,31 @@ def test_scenario_replay_end_to_end():
     assert len(scores) == len(ev)
     assert set(scores["verdict"]) <= {"ALLOW", "ALLOW_OBSERVE", "STEPUP", "DENY"}
     assert (scores["r"] >= scores["r_request"]).all()            # propagation is a max
+
+
+def _shim_up() -> bool:
+    try:
+        from ztb.ledger.client import FabricLedger
+
+        FabricLedger(timeout=3).health()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+@pytest.mark.skipif(not _shim_up(), reason="needs the Fabric test-network and shim")
+def test_trails_on_the_live_fabric_ledger_detects_cover_tracks():
+    trails = Trails(backend="fabric")
+    assert trails.backend == "fabric"
+    ev = pd.Series({"ts": pd.Timestamp("2011-02-14 09:00:00"), "action": "s3:GetObject",
+                    "resource": "arn:aws:s3:::ztb-x/removable/PC-1"})
+    x = np.zeros(34, np.float32)
+    for i in range(8):
+        trails.record("DEMOTEST", ev, 0.9, 0.9, "DENY" if i % 2 else "ALLOW", x)
+    trails.flush(timeout=120)
+    assert trails.committed == 8 and trails.rejected == 0, trails.last_error
+    assert trails.verify("DEMOTEST")["intact"]
+    actions = trails.cover_tracks("DEMOTEST", n_delete=1, n_modify=1)
+    assert len(actions) == 2
+    v = trails.verify("DEMOTEST")
+    assert not v["intact"] and v["firstDiscontinuity"] >= 0

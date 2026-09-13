@@ -26,7 +26,6 @@ from ztb.demo.engine import (  # noqa: E402
     top_features,
 )
 from ztb.features.builder import FEATURE_NAMES  # noqa: E402
-from ztb.pdp.signer import Signer  # noqa: E402
 
 st.set_page_config(page_title="ZTBAudit demo", layout="wide", page_icon="🛡️")
 
@@ -47,7 +46,7 @@ def init_state(sc: Scenario) -> None:
         ss.principal = sc.principal
         ss.day_idx = 0
         ss.playing = False
-        ss.trails = Trails(Signer.generate())
+        ss.trails = Trails(backend=st.session_state.get("backend", "auto"))
         ss.right_log = []          # per request: dict rows
         ss.day_rows = []           # per day summary
         ss.last_verify = None
@@ -78,7 +77,7 @@ def replay_day(art: Artefacts, sc: Scenario, day: str) -> None:
                                                                 VERDICT_COLOUR}})
     ss.last_top, ss.last_R = top, float(scores["R"].max()) if len(scores) else 0.0
     ss.last_verdict = scores["verdict"].iloc[int(scores["R"].idxmax())] if len(scores) else "ALLOW"
-    ss.last_verify = ss.trails.verify(sc.principal)
+    ss.last_verify = ss.trails.verify(sc.principal) if ss.trails.committed else None
 
 
 def gauge(R: float, verdict: str) -> go.Figure:
@@ -106,6 +105,15 @@ def main() -> None:
                        f"{len(sc.days)} days · {int(sc.events['label'].sum())} scripted-malicious")
     st.sidebar.caption("operating configuration: random forest on user-day vectors "
                        "(SHAP top-3), propagated to each request as r′ = max(request r, day r)")
+    tr = ss.trails
+    st.sidebar.markdown(f"**ledger: {tr.backend}** · committed {tr.committed} · pending "
+                       f"{tr.pending} · rejected {tr.rejected}")
+    if tr.backend == "fabric":
+        st.sidebar.caption("Hyperledger Fabric test-network via the gateway shim; each commit "
+                           "waits for its block, so the ledger lags the replay (asynchronous "
+                           "committer, as in the paper).")
+    if tr.last_error:
+        st.sidebar.error(tr.last_error)
     c1, c2, c3 = st.sidebar.columns(3)
     if c1.button("▶ play" if not ss.playing else "⏸ pause"):
         ss.playing = not ss.playing
@@ -151,7 +159,8 @@ def main() -> None:
             v = ss.last_verify
             status = ("✅ intact" if v["intact"]
                       else f"❌ broken at seq {v['firstDiscontinuity'] + 1}")
-            st.markdown(f"ledger: **{v['records']} records**, VerifyChain → {status}")
+            st.markdown(f"ledger ({ss.trails.backend}): **{v['records']} committed records**, "
+                        f"VerifyChain → {status}")
 
     if ss.day_rows:
         st.markdown("#### day-by-day")
@@ -159,9 +168,11 @@ def main() -> None:
 
     st.markdown("---")
     b1, b2 = st.columns([1, 3])
-    if b1.button("🕵️ Cover tracks", type="primary", disabled=not ss.right_log):
+    can_tamper = ss.trails.committed >= 6
+    b1.caption("" if can_tamper else f"needs ≥ 6 committed records ({ss.trails.committed})")
+    if b1.button("🕵️ Cover tracks", type="primary", disabled=not can_tamper):
         actions = ss.trails.cover_tracks(sc.principal)
-        ss.last_verify = ss.trails.verify(sc.principal)
+        ss.last_verify = ss.trails.verify(sc.principal) if ss.trails.committed else None
         ss.cover_actions = actions
     if ss.get("cover_actions"):
         acts = ss.cover_actions
@@ -177,7 +188,7 @@ def main() -> None:
             st.markdown(f"**Plain IAM log:** {len(ss.trails.plain)} records, nothing to check "
                         f"against — the edits are invisible.")
             st.markdown(f"**Ledger VerifyChain:** {verdict_line}")
-            recs = pd.DataFrame(ss.trails.ledger.by_principal(sc.principal))
+            recs = pd.DataFrame(ss.trails.ledger_records(sc.principal))
             if len(recs) and not v["intact"]:
                 bad = v["firstDiscontinuity"]
                 view = recs[["seq", "ts", "action", "verdict", "prevHash"]].copy()

@@ -226,13 +226,7 @@ COUCHDB = None   # set from --couchdb; e.g. http://admin:adminpw@localhost:5984/
 
 
 def _admin(ledger, op: str, rec: dict) -> None:
-    """A3's direct write to the peer's state database, bypassing the chaincode.
-
-    Against Fabric this edits the endorsing peer's CouchDB document for ``rec/<recId>``
-    directly (test-network exposes couchdb0 with admin credentials), which is exactly
-    what a privileged log manipulator with host access would do; the chaincode never
-    sees it, and VerifyChain has to catch it from the state alone.
-    """
+    """A3's direct write to the peer's state database, bypassing the chaincode."""
     if isinstance(ledger, SimLedger):
         if op == "delete":
             ledger._admin_delete(rec["recId"])
@@ -242,31 +236,13 @@ def _admin(ledger, op: str, rec: dict) -> None:
     if not COUCHDB:
         raise SystemExit("--couchdb is required for fabric-mode tampering "
                          "(e.g. http://admin:adminpw@localhost:5984/mychannel_auditcontract)")
-    import base64
-    import urllib.parse
-    import urllib.request
+    from ztb.ledger.couchdb import CouchDBAdmin
 
-    # urllib does not accept user:pass@ in URLs; send basic auth as a header instead.
-    u = urllib.parse.urlsplit(COUCHDB)
-    headers = {"content-type": "application/json"}
-    if u.username:
-        token = base64.b64encode(f"{u.username}:{u.password or ''}".encode()).decode()
-        headers["Authorization"] = f"Basic {token}"
-    base = f"{u.scheme}://{u.hostname}:{u.port}{u.path}"
-    doc_url = f"{base}/{urllib.parse.quote('rec/' + rec['recId'], safe='')}"
-    with urllib.request.urlopen(urllib.request.Request(doc_url, headers=headers),
-                                timeout=10) as resp:
-        doc = json.loads(resp.read())
+    admin = CouchDBAdmin(COUCHDB)
     if op == "delete":
-        req = urllib.request.Request(f"{doc_url}?rev={doc['_rev']}", method="DELETE",
-                                     headers=headers)
+        admin.delete(rec["recId"])
     else:
-        body = dict(doc)
-        body.update({k: v for k, v in rec.items()})          # edited fields, same _id/_rev
-        req = urllib.request.Request(doc_url, data=json.dumps(body).encode(), method="PUT",
-                                     headers=headers)
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        resp.read()
+        admin.overwrite(rec["recId"], rec)
 
 
 def main(argv: list[str] | None = None) -> int:

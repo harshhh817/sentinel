@@ -100,6 +100,18 @@ three-node Raft orderer; `test-network` uses a single orderer — for the demo t
 policy is what matters). Point additional shim instances at `peer0.org2` / `peer0.org3` by
 setting `PEER`, `PEER_HOST_ALIAS`, `MSP_ID` and the org's crypto path.
 
+## Peer state cache
+
+The peer keeps an in-memory cache in front of CouchDB. A direct CouchDB edit is therefore
+invisible to `VerifyChain` on that peer until the key is evicted or the peer restarts — the
+tamper experiment only saw its edits because 10,000 control writes had churned the cache. For
+the demo the peers run with `CORE_LEDGER_STATE_COUCHDBCONFIG_CACHESIZE=0` (added to
+`compose/compose-couch.yaml`; recreate the peers with `docker compose ... up -d --no-deps
+peer0.org1.example.com peer0.org2.example.com` under the `compose` project name so the ledger
+volumes reattach). In a real deployment the auditor verifies on a peer they control, whose cache
+the adversary never touched — the same reason the other organisation's peer shows the chain
+intact while the tampered organisation's does not.
+
 ## Residual risk
 
 `VerifyChain` reads the world state. An adversary who deletes a principal's tail records **and**

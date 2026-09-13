@@ -355,8 +355,13 @@ removable-media + web), replayed day by day at an adjustable speed.
   *both* stores. The plain log just gets shorter; the ledger's `VerifyChain` reports the first
   discontinuity and the broken link is highlighted.
 
-The dashboard runs entirely locally (`ztb/ledger/sim.py`); with the test-network up it can be
-pointed at the real ledger through the same `LedgerSink` interface. The scenario parquet is
+With the test-network and shim up the dashboard uses the **live Fabric ledger** (auto-detected;
+sidebar shows `ledger: fabric`, committed / pending / rejected): each request's record is signed,
+chained and committed by an ordered background thread — the PDP's asynchronous committer — so the
+ledger lags the replay by the block cadence; "Cover tracks" then edits the endorsing peer's
+CouchDB directly and `VerifyChain` on that peer reports the break. Without the network it falls
+back to `ztb/ledger/sim.py`. The peers must run with the CouchDB state cache disabled for
+direct edits to be visible immediately (see `chaincode/README.md`). The scenario parquet is
 derived from the licence-restricted corpus and is not committed; regenerate it with
 `make demo-scenario`.
 
