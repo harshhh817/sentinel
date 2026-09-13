@@ -1,5 +1,5 @@
 {
-  "ledger": "sim",
+  "ledger": "fabric",
   "attempts": 500,
   "per_kind": 125,
   "control_records": 10000,
