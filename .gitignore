@@ -17,6 +17,9 @@ models/*
 *.pem
 keys/
 
+# demo scenario is derived from the licence-restricted corpus
+demo/*.parquet
+
 # PDP runtime state: keys, local ledger, off-chain evidence store
 state/
 evidence/

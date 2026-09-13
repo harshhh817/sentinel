@@ -1,0 +1,100 @@
+{
+  "principal": "HBO0413",
+  "events": 4578,
+  "malicious": 229,
+  "window": [
+    "2011-02-11",
+    "2011-04-11"
+  ],
+  "days": 42,
+  "candidates": [
+    {
+      "principal": "HBO0413",
+      "malicious_events": 229,
+      "days": 28,
+      "first": "2011-02-14",
+      "last": "2011-04-08",
+      "sources": {
+        "http": "127",
+        "device": "102"
+      }
+    },
+    {
+      "principal": "CCL0068",
+      "malicious_events": 215,
+      "days": 26,
+      "first": "2011-01-03",
+      "last": "2011-02-21",
+      "sources": {
+        "device": "132",
+        "http": "83"
+      }
+    },
+    {
+      "principal": "MDH0580",
+      "malicious_events": 213,
+      "days": 29,
+      "first": "2011-01-04",
+      "last": "2011-03-03",
+      "sources": {
+        "http": "129",
+        "device": "84"
+      }
+    },
+    {
+      "principal": "FSC0601",
+      "malicious_events": 210,
+      "days": 29,
+      "first": "2011-01-18",
+      "last": "2011-03-17",
+      "sources": {
+        "http": "136",
+        "device": "74"
+      }
+    },
+    {
+      "principal": "NWT0098",
+      "malicious_events": 200,
+      "days": 28,
+      "first": "2011-02-07",
+      "last": "2011-04-05",
+      "sources": {
+        "http": "130",
+        "device": "70"
+      }
+    },
+    {
+      "principal": "CEJ0109",
+      "malicious_events": 190,
+      "days": 27,
+      "first": "2011-02-07",
+      "last": "2011-04-01",
+      "sources": {
+        "http": "120",
+        "device": "70"
+      }
+    },
+    {
+      "principal": "CQW0652",
+      "malicious_events": 190,
+      "days": 27,
+      "first": "2011-02-18",
+      "last": "2011-04-14",
+      "sources": {
+        "http": "120",
+        "device": "70"
+      }
+    },
+    {
+      "principal": "IKR0401",
+      "malicious_events": 175,
+      "days": 23,
+      "first": "2011-01-03",
+      "last": "2011-02-17",
+      "sources": {
+        "device": "92",
+        "http": "83"
+      }
+    }
+  ]
+}

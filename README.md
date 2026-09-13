@@ -33,6 +33,7 @@ request ─▶ PEP (auth + device posture)
 | 2 | Risk engine, trust algorithm, Tables V and VI | **done — see Results** |
 | 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | **done (local mode)** |
 | 4 | Fabric chaincode, committer, tamper experiment, Table VII | **done (chaincode tested; live network needs Docker)** |
+| 3b | Demo dashboard: Plain IAM vs ZTBAudit, one insider replayed day by day | **done** |
 | 5 | AWS cloud mode (optional) | not started |
 
 See `PLAN.md` for the full task list per module.
@@ -333,6 +334,31 @@ Records are ECDSA-P-256-signed over a canonical JSON of the tuple, hash-chained 
 (`seq`, `prevHash`), and carry `h_feat = SHA-256(x ‖ salt)`; the vector and salt go to a
 Fernet-encrypted off-chain store under `state/evidence/`. The committer drains an asyncio queue
 into an append-only JSONL ledger under `state/ledger/` until the Fabric client lands in Module 4.
+
+## Demo dashboard (Module 3b)
+
+```bash
+make demo-scenario      # picks the test-window insider with the most scripted events -> demo/
+make demo               # streamlit run ztb/demo/app.py
+```
+
+Split screen over one CERT insider (`HBO0413`: 4,578 requests over 42 days, 229 scripted-malicious,
+removable-media + web), replayed day by day at an adjustable speed.
+
+- **Left, Plain IAM** — entitlement only: every request is ALLOW and the log is a mutable list.
+- **Right, ZTBAudit** — the operating configuration from the Progression section: the random
+  forest on the principal's user-day vector gives the day's risk (SHAP top-3 contributing features
+  shown), propagated to each request as r′ = max(request-level r, day r), through eq. (4) and
+  Table III into a live gauge and verdict colour; every request becomes a signed, hash-chained
+  record on the reference ledger with `VerifyChain` status.
+- **Cover tracks** — A3 deletes three suspicious records and rewrites three verdicts to ALLOW in
+  *both* stores. The plain log just gets shorter; the ledger's `VerifyChain` reports the first
+  discontinuity and the broken link is highlighted.
+
+The dashboard runs entirely locally (`ztb/ledger/sim.py`); with the test-network up it can be
+pointed at the real ledger through the same `LedgerSink` interface. The scenario parquet is
+derived from the licence-restricted corpus and is not committed; regenerate it with
+`make demo-scenario`.
 
 ## Ledger (Module 4)
 

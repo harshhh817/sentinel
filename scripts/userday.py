@@ -90,8 +90,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--train-from-val", action="store_true")
     ap.add_argument("--eval-subsample", type=int, default=4_000_000)
+    ap.add_argument("--save-models", type=Path, default=MODELS / "userday",
+                    help="where to persist the seed-0 user-day engine and supervised models")
     a = ap.parse_args(argv)
     a.out.mkdir(parents=True, exist_ok=True)
+    if a.save_models is not None:
+        a.save_models.mkdir(parents=True, exist_ok=True)
 
     # 1. user-days
     if a.train_from_val:
@@ -144,6 +148,22 @@ def main(argv: list[str] | None = None) -> int:
                   f"tuned F1 {tuned.f1:.3f}", flush=True)
     table_ud = {n: summarise(per_seed[n]) for n in MODEL_ORDER}
     _write_table_v(a.out / "table_v_userday.csv", table_ud)
+
+    # Persist the seed-0 user-day artefacts for the PDP demo (SHAP on the RF).
+    if a.save_models is not None:
+        import joblib
+
+        eng0 = train_userday_engine(tr_ud, cal_ud, seed=a.seeds[0], epochs=a.epochs,
+                                    device=a.device, alpha=FUSION_ALPHA)
+        eng0.save(a.save_models, a.seeds[0])
+        x_sup, y_sup = eng0.standardise(tr_ud.x), tr_ud.y
+        if y_sup.sum() == 0:
+            x_sup, y_sup = eng0.standardise(cal_ud.x), cal_ud.y
+        for name in SUPERVISED:
+            joblib.dump(fit_baseline(name, x_sup, y_sup, seed=a.seeds[0]),
+                        a.save_models / f"{name}_seed{a.seeds[0]}.joblib", compress=3)
+        (a.save_models / "userday_features.json").write_text(json.dumps(list(USERDAY_FEATURES)))
+        print(f"saved user-day engine + supervised models -> {a.save_models}", flush=True)
 
     # 4. propagate to request level: r' = max(r_request, r_userday[principal, day])
     print("== propagation to request level", flush=True)

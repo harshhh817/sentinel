@@ -17,7 +17,7 @@ CAFF        := $(shell command -v caffeinate 2> /dev/null)
 KEEPAWAKE   := $(if $(CAFF),caffeinate -dims,)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup test lint sample dataset train eval ablation latency tamper demo serve clean
+.PHONY: help setup test lint sample dataset train eval ablation latency tamper demo demo-scenario serve clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -65,8 +65,11 @@ tamper: ## Table VII — 500 tamper attempts + 10k clean control run
 serve: ## Run the PDP locally on :8000
 	$(BIN)/uvicorn ztb.pdp.app:app --reload --port 8000
 
-demo: ## Full demo: PDP + ledger, replay 200 events, live tamper catch
-	$(BIN)/python scripts/demo.py
+demo: ## Split-screen dashboard: Plain IAM vs ZTBAudit over one CERT insider (Streamlit)
+	$(BIN)/streamlit run ztb/demo/app.py
+
+demo-scenario: ## Extract the demo scenario from the test split -> demo/
+	$(BIN)/python scripts/demo_scenario.py --data "$(DATA)" --out demo
 
 clean: ## Remove caches and build artefacts (keeps models/ and results/)
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
