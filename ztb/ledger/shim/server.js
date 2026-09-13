@@ -32,10 +32,10 @@ async function gateway() {
   const identity = { mspId: MSP_ID, credentials: await fs.readFile(certPath) };
   const signer = signers.newPrivateKeySigner(createPrivateKey(await fs.readFile(keyPath)));
   const gw = connect({ client, identity, signer,
-    evaluateOptions: () => ({ deadline: Date.now() + 5000 }),
-    endorseOptions: () => ({ deadline: Date.now() + 15000 }),
-    submitOptions: () => ({ deadline: Date.now() + 15000 }),
-    commitStatusOptions: () => ({ deadline: Date.now() + 60000 }) });
+    evaluateOptions: () => ({ deadline: Date.now() + 60000 }),
+    endorseOptions: () => ({ deadline: Date.now() + 60000 }),
+    submitOptions: () => ({ deadline: Date.now() + 60000 }),
+    commitStatusOptions: () => ({ deadline: Date.now() + 120000 }) });
   return gw.getNetwork(CHANNEL).getContract(CHAINCODE);
 }
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from typing import Any
@@ -27,23 +28,30 @@ DEFAULT_URL = os.environ.get("ZTB_FABRIC_SHIM", "http://127.0.0.1:7071")
 
 
 class FabricLedger:
-    def __init__(self, url: str = DEFAULT_URL, timeout: float = 30.0):
+    def __init__(self, url: str = DEFAULT_URL, timeout: float = 150.0):
         self.url = url.rstrip("/")
         self.timeout = timeout
 
-    def _call(self, path: str, payload: dict[str, Any] | None = None) -> Any:
+    def _call(self, path: str, payload: dict[str, Any] | None = None,
+              retries: int = 3) -> Any:
         data = None if payload is None else json.dumps(payload).encode()
-        req = urllib.request.Request(self.url + path, data=data,
-                                     headers={"content-type": "application/json"},
-                                     method="POST" if data is not None else "GET")
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                return json.loads(resp.read() or b"null")
-        except urllib.error.HTTPError as e:
-            body = e.read().decode(errors="replace")
-            if e.code == 422:                     # endorsement rejected by the chaincode
-                raise LedgerRejected(body) from None
-            raise RuntimeError(f"fabric shim {path}: HTTP {e.code}: {body}") from None
+        last: Exception | None = None
+        for attempt in range(retries):
+            req = urllib.request.Request(self.url + path, data=data,
+                                         headers={"content-type": "application/json"},
+                                         method="POST" if data is not None else "GET")
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    return json.loads(resp.read() or b"null")
+            except urllib.error.HTTPError as e:
+                body = e.read().decode(errors="replace")
+                if e.code == 422:                 # endorsement rejected by the chaincode
+                    raise LedgerRejected(body) from None
+                last = RuntimeError(f"fabric shim {path}: HTTP {e.code}: {body}")
+            except (urllib.error.URLError, TimeoutError, OSError) as e:
+                last = RuntimeError(f"fabric shim {path}: {e}")
+            time.sleep(1.5 * (attempt + 1))      # transport/deadline errors are retried
+        raise last  # type: ignore[misc]
 
     # --- LedgerSink -------------------------------------------------------------
 
