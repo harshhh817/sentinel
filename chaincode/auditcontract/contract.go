@@ -39,7 +39,7 @@ type VerifyResult struct {
 	Records            int    `json:"records"`
 	Intact             bool   `json:"intact"`
 	FirstDiscontinuity int    `json:"firstDiscontinuity"` // -1 when intact
-	Reason             string `json:"reason,omitempty"`
+	Reason             string `json:"reason" metadata:",optional"`
 }
 
 // SetPDPPublicKey installs the PDP's P-256 public key (PEM). It can be set once;
