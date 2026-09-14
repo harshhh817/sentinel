@@ -2,27 +2,86 @@
 
 Reference implementation of **"AI-Driven Zero-Trust Cloud Access Control with Blockchain-Anchored
 Audit Trails: An AWS-Based Architecture"** — Harsh Gupta, Shivam, Aditya, Sheenam Naaz, Kapil Kumar
-(Sharda University). The paper is `paper.pdf` in this repo.
+(Sharda University). The paper is `paper.pdf` in this repo. Final-year B.Tech project: every
+component of the paper is built, every reported number is reproduced by a script in `results/`,
+and where the paper's numbers do not reproduce the README says so and why.
 
-Every access request is intercepted, converted into a 34-dimensional behavioural feature vector,
-scored by a hybrid autoencoder + isolation-forest engine, turned into a verdict by a trust
-algorithm that also accounts for resource sensitivity, and recorded as a signed, hash-chained
-audit entry on a permissioned Hyperledger Fabric ledger.
+```mermaid
+flowchart LR
+    subgraph Request path — synchronous
+        S[Subject] --> PEP[PEP<br/>auth + device posture]
+        PEP --> SP{Static RBAC/ABAC<br/>IAM stand-in}
+        SP -- forbidden --> DENY[DENY]
+        SP -- permitted --> F[34-dim feature vector<br/>per-principal baseline, EWMA 30 d]
+        F --> RE[Risk engine<br/>autoencoder + isolation forest<br/>r = α F̂ₑ + (1−α) F̂ₛ]
+        F --> UD[User-day RF<br/>operating configuration]
+        RE --> T[Trust algorithm eq. 4<br/>R = f(r, sensitivity, MFA credit)]
+        UD --> T
+        T --> V{Table III band}
+        V -- R<0.40 --> A[ALLOW 60 min]
+        V -- 0.40–0.65 --> AO[ALLOW observe 30 min]
+        V -- 0.65–0.85 --> SU[STEP-UP 15 min<br/>signed challenge]
+        V -- ≥0.85 --> DENY
+        A & AO & SU --> CRED[Scoped credential<br/>mock token / STS]
+    end
+    subgraph Evidence path — asynchronous
+        T --> REC[Signed record eq. 5<br/>seq, prevHash, h_feat, ECDSA P-256]
+        REC --> Q[Queue + committer]
+        Q --> L[(Hyperledger Fabric<br/>auditcontract: LogAccess, QueryBy*, VerifyChain)]
+        REC --> EV[(Encrypted off-chain<br/>evidence store x ‖ salt)]
+    end
+```
 
+**Quick start:** `make setup && make test` — then `make demo` (see *How to run the demo* below).
+
+## Results vs paper
+
+Every number below is produced by a script; the paper's are from its Tables V–VII and Figs. 5–6.
+
+| Quantity | Paper | This implementation | Why the gap |
+|---|---:|---:|---|
+| Test-window events / positives | 2,184,663 / 3,912 (0.179 %) | 7,675,354 / 1,754 (0.023 %) | We replay all four CERT sources at event level (94 % http); the paper's smaller window implies http was not replayed per event. |
+| Hybrid AUC (paper's design) | 0.964 | 0.748 | 94 % http makes the benign calibration http-shaped; the 0.748 is mostly "is not http", a class-prior artefact. |
+| Hybrid F1 / FPR at R ≥ 0.85 | 0.927 / 0.41 % | 0.001 / 72 % | A benign-quantile r puts ~35 % of benign traffic above R ≥ 0.85 by construction; the paper's operating point cannot hold for a quantile score. |
+| Hybrid AUC, per-source calibration | — | 0.481 | Removing the artefact reveals chance-level within-type signal on the test window. |
+| Hybrid AUC, per-source models | — | 0.525 | Same; the autoencoder stays below 0.5 (malicious rows reconstruct slightly *better*). |
+| Isolation forest / autoencoder AUC | 0.897 / 0.941 | 0.774 / 0.680 | Same mechanism; the autoencoder is the weaker detector here, the reverse of the paper. |
+| Supervised RF AUC (event level) | 0.913 | 0.997 | The scenarios leave real, discriminative structure in the 34 features; it is not off-manifold. |
+| Unsupervised hybrid AUC, user-day | — | 0.800 (forest 0.791) | Aggregation is where the unsupervised signal lives; propagated to requests: 0.748 → 0.799. |
+| **Operating configuration** | hybrid | **RF on user-day vectors, AUC 0.954 (LR) / 0.911 (RF)** | The only configurations above 0.85; supervised, labelled from the validation window's first half (training window rerun pending the disk). |
+| Ablation: drop autoencoder / drop forest | −0.087 / −0.033 F1 | AUC 0.774 / 0.680 (vs 0.748) | Dropping the autoencoder *helps*; per-principal action frequency still beats global (0.748 vs 0.733). |
+| Injected gross anomalies (sanity) | — | hybrid AUC 0.997 (3 AM egress, 50× volume) | The pipeline detects off-manifold behaviour; the scripted scenarios are not off-manifold at event level. |
+| Added latency, median / p95 | 61.3 / 109.8 ms | 2.57 / 2.79 ms | In-process PDP with the model co-located; the paper's figure includes API Gateway → Lambda → SageMaker hops. |
+| Ledger peak throughput | ≈ 450 tx/s | ≈ 50 tx/s | Nine t3.medium hosts and a three-node Raft orderer vs one laptop running two peers + one orderer under Docker Desktop, 2 s batch timeout. |
+| Commit latency at 200 tx/s | 84 ms | 563 ms p50 | Same; block cadence dominates on the laptop network. |
+| Tampering detected / false alarms | 500 / 500, 0 / 10⁴ | **500 / 500, 0 / 10,000** (live Fabric) | Reproduced; edits applied directly to the peer's CouchDB, fabrication rejected at endorsement. |
+
+Three departures from the paper's text are deliberate and documented in the source: eq. (4) as
+typeset makes the compensating-control credit *raise* risk (R = βc at r = 0), so the credit scales
+risk down instead; c = 0 throughout the CERT replay (the corpus has no MFA/managed-device signal;
+the PDP computes c from a real auth context); the supervised baselines train on the scenario rows
+that fall inside the training window (`train_malicious.parquet`).
+
+## How to run the demo (fresh clone)
+
+```bash
+git clone <repo> ztbaudit && cd ztbaudit
+make setup                                   # Python 3.11 venv, pinned deps
+make test                                    # 44 tests, no network needed
+# models: either train (needs data/processed from `make dataset`) or unpack a models/ bundle
+make train && make eval                      # ~2.5 h on a laptop; or copy models/ from a teammate
+python scripts/userday.py --data data/processed --save-models models/userday   # user-day RF (SHAP)
+make demo-scenario                           # one insider's test-window events -> demo/
+make demo-check                              # Docker, network, shim, models, scenario
+make demo                                    # Streamlit at http://localhost:8501
 ```
-request ─▶ PEP (auth + device posture)
-             │
-             ▼
-           PDP ── static RBAC/ABAC check ──▶ DENY if IAM forbids
-             │
-             ├─ 34-dim feature vector  (Table II)
-             ├─ hybrid risk score r    (eq. 3, α = 0.6)
-             ├─ effective risk R       (eq. 4, λ = 1.5, β = 0.25)
-             └─ verdict / TTL / scope  (Table III)
-             │
-             ├──▶ scoped STS credential (cloud) or mock token (local)   [synchronous]
-             └──▶ signed audit record ─▶ queue ─▶ Fabric ledger        [asynchronous]
-```
+
+Live-ledger mode (optional, ~15 min the first time): install Docker Desktop, then follow
+`chaincode/README.md` — `install-fabric.sh`, `network.sh up createChannel -ca -s couchdb`, build the
+chaincode image, `deployCCAAS`, disable the peers' state cache, `npm install && node server.js` in
+`ztb/ledger/shim`. `make demo-check` reports which of these is missing; without them the demo
+falls back to the in-process reference ledger with the same behaviour. `docs/DEMO_SCRIPT.md` is
+the five-minute runbook; `docs/VIVA.md` the examiner Q&A.
 
 ## Status
 

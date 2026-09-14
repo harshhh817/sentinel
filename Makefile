@@ -17,7 +17,7 @@ CAFF        := $(shell command -v caffeinate 2> /dev/null)
 KEEPAWAKE   := $(if $(CAFF),caffeinate -dims,)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup test lint sample dataset train eval ablation latency tamper demo demo-scenario serve clean
+.PHONY: help setup test lint sample dataset train eval ablation latency tamper demo demo-check demo-scenario serve clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -67,6 +67,9 @@ serve: ## Run the PDP locally on :8000
 
 demo: ## Split-screen dashboard: Plain IAM vs ZTBAudit over one CERT insider (Streamlit)
 	$(BIN)/streamlit run ztb/demo/app.py
+
+demo-check: ## Verify Docker, Fabric network, shim, models and scenario before the demo
+	$(BIN)/python scripts/demo_check.py
 
 demo-scenario: ## Extract the demo scenario from the test split -> demo/
 	$(BIN)/python scripts/demo_scenario.py --data "$(DATA)" --out demo
