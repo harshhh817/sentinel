@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestClassifier
 
-from ztb.demo.engine import (
+from sentinel.demo.engine import (
     DEMO_DIR,
     Artefacts,
     Scenario,
@@ -18,8 +18,8 @@ from ztb.demo.engine import (
     request_scores,
     top_features,
 )
-from ztb.pdp.signer import Signer
-from ztb.risk.userday import USERDAY_FEATURES
+from sentinel.pdp.signer import Signer
+from sentinel.risk.userday import USERDAY_FEATURES
 
 HAVE_SCENARIO = (DEMO_DIR / "scenario_meta.json").exists()
 HAVE_MODELS = (Path("models") / "engine_seed0.json").exists()
@@ -55,7 +55,7 @@ def test_top_features_returns_three_named_contributions(tiny_art):
 def test_trails_sign_chain_and_cover_tracks_breaks_only_the_ledger():
     trails = Trails(Signer.generate(), backend="sim")
     ev = pd.Series({"ts": pd.Timestamp("2011-02-14 09:00:00"), "action": "s3:GetObject",
-                    "resource": "arn:aws:s3:::ztb-x/removable/PC-1"})
+                    "resource": "arn:aws:s3:::sentinel-x/removable/PC-1"})
     x = np.zeros(34, np.float32)
     for i in range(12):
         verdict = "DENY" if i % 3 == 0 else "ALLOW"
@@ -82,7 +82,7 @@ def test_scenario_replay_end_to_end():
     ev = sc.events[sc.events["day"] == day]
     x_day = sc.x_day(day)
     assert x_day is not None and x_day.shape == (len(USERDAY_FEATURES),)
-    from ztb.features.builder import FEATURE_NAMES
+    from sentinel.features.builder import FEATURE_NAMES
 
     x = ev[list(FEATURE_NAMES)].to_numpy(np.float32)
     scores = request_scores(art, x, ev["type"].to_numpy(), day_risk(art, x_day),
@@ -94,7 +94,7 @@ def test_scenario_replay_end_to_end():
 
 def _shim_up() -> bool:
     try:
-        from ztb.ledger.client import FabricLedger
+        from sentinel.ledger.client import FabricLedger
 
         FabricLedger(timeout=3).health()
         return True
@@ -107,7 +107,7 @@ def test_trails_on_the_live_fabric_ledger_detects_cover_tracks():
     trails = Trails(backend="fabric")
     assert trails.backend == "fabric"
     ev = pd.Series({"ts": pd.Timestamp("2011-02-14 09:00:00"), "action": "s3:GetObject",
-                    "resource": "arn:aws:s3:::ztb-x/removable/PC-1"})
+                    "resource": "arn:aws:s3:::sentinel-x/removable/PC-1"})
     x = np.zeros(34, np.float32)
     for i in range(8):
         trails.record("DEMOTEST", ev, 0.9, 0.9, "DENY" if i % 2 else "ALLOW", x)

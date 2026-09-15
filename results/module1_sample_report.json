@@ -1,6 +1,6 @@
 {
   "root": "data/raw/r4.2",
-  "out_dir": "/Users/harshgupta/projects/ztbaudit/data/processed/sample",
+  "out_dir": "/Users/harshgupta/projects/sentinel/data/processed/sample",
   "months_sampled": 1,
   "boundaries": {
     "corpus_start": "2010-01-02T06:49:00",

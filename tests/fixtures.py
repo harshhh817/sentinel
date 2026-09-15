@@ -16,7 +16,7 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ztb.features.schema import CERT_HEADERS, CERT_TIME_FORMAT, LDAP_HEADER
+from sentinel.features.schema import CERT_HEADERS, CERT_TIME_FORMAT, LDAP_HEADER
 
 USERS = ["AAM0658", "BCD1234", "CDE1846", "DEF2222"]
 PCS = ["PC-0001", "PC-0002", "PC-0003"]
@@ -147,7 +147,7 @@ import numpy as np  # noqa: E402
 import pyarrow as pa  # noqa: E402
 import pyarrow.parquet as pq  # noqa: E402
 
-from ztb.features.builder import FEATURE_NAMES, StandardiserAccumulator  # noqa: E402
+from sentinel.features.builder import FEATURE_NAMES, StandardiserAccumulator  # noqa: E402
 
 LATENT_DIM = 5
 
@@ -266,7 +266,7 @@ def write_synthetic_splits(
             "principal": [f"U{rng.integers(0, 200):04d}" for _ in range(n)],
             "action": rng.choice(["s3:GetObject", "execute-api:Invoke", "sts:AssumeRole",
                                   "sts:SessionEnd"], size=n, p=[0.05, 0.9, 0.03, 0.02]).tolist(),
-            "resource": ["arn:aws:s3:::ztb-synth/x"] * n,
+            "resource": ["arn:aws:s3:::sentinel-synth/x"] * n,
             "source": ["synthetic"] * n,
             "label": y.tolist(),
         }

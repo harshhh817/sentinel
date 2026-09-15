@@ -8,10 +8,9 @@ from datetime import datetime, timedelta
 import numpy as np
 import pytest
 
-from tests.fixtures import write_corpus
-from ztb.config import N_FEATURES
-from ztb.features.baseline import BaselineStore, PrincipalProfile, _decay_factor
-from ztb.features.builder import (
+from sentinel.config import N_FEATURES
+from sentinel.features.baseline import BaselineStore, PrincipalProfile, _decay_factor
+from sentinel.features.builder import (
     CONTINUOUS_FEATURES,
     FEATURE_NAMES,
     Standardiser,
@@ -20,9 +19,10 @@ from ztb.features.builder import (
     host_identity,
     observe_event,
 )
-from ztb.features.cert_mapper import stream_events
-from ztb.features.labels import load_labels
-from ztb.features.schema import CERT_HEADERS, CloudEvent, SchemaError, validate_header
+from sentinel.features.cert_mapper import stream_events
+from sentinel.features.labels import load_labels
+from sentinel.features.schema import CERT_HEADERS, CloudEvent, SchemaError, validate_header
+from tests.fixtures import write_corpus
 
 
 @pytest.fixture(scope="module")
@@ -76,7 +76,7 @@ def test_timestamps_and_identities_are_preserved(corpus):
 def test_resources_carry_the_org_unit(corpus):
     events = [e for e in stream_events(corpus["root"]) if e.resource.startswith("arn:aws:s3")]
     assert events
-    assert all("ztb-" in e.resource for e in events)
+    assert all("sentinel-" in e.resource for e in events)
 
 
 def test_until_cutoff_limits_the_scan(corpus):
@@ -167,7 +167,7 @@ def test_novelty_flags_track_first_occurrence():
 # --- feature builder -------------------------------------------------------
 
 
-def _event(ts, action="s3:GetObject", resource="arn:aws:s3:::ztb-research/x", pc="PC-1"):
+def _event(ts, action="s3:GetObject", resource="arn:aws:s3:::sentinel-research/x", pc="PC-1"):
     return CloudEvent(event_id="{A-B-C}", ts=ts, principal="u", action=action,
                       resource=resource, source="file", pc=pc)
 
@@ -248,7 +248,7 @@ def test_action_frequency_is_per_principal():
 def test_sensitivity_ranks_egress_highest():
     idx = FEATURE_NAMES.index("resource_sensitivity")
     removable = CloudEvent("{i}", datetime(2010, 1, 1), "u", "s3:GetObject",
-                           "arn:aws:s3:::ztb-x/removable/PC-1", "device", egress=True)
+                           "arn:aws:s3:::sentinel-x/removable/PC-1", "device", egress=True)
     session = _event(datetime(2010, 1, 1), action="sts:AssumeRole",
                      resource="arn:aws:iam::0:role/x")
     p = PrincipalProfile("u")
@@ -324,7 +324,7 @@ def test_standardiser_round_trips():
 def test_streaming_standardiser_matches_batch_fit():
     """Welford accumulator must agree with Standardiser.fit, which it replaces on the
     full corpus because the training window does not fit in memory."""
-    from ztb.features.builder import StandardiserAccumulator
+    from sentinel.features.builder import StandardiserAccumulator
 
     rng = np.random.default_rng(11)
     matrix = rng.normal(size=(2000, N_FEATURES)) * 7 + 3
@@ -339,7 +339,7 @@ def test_streaming_standardiser_matches_batch_fit():
 
 
 def test_streaming_standardiser_memory_is_independent_of_rows():
-    from ztb.features.builder import StandardiserAccumulator
+    from sentinel.features.builder import StandardiserAccumulator
 
     acc = StandardiserAccumulator()
     assert not hasattr(acc, "__dict__"), "accumulator must stay __slots__-only"
@@ -351,7 +351,7 @@ def test_streaming_standardiser_memory_is_independent_of_rows():
 
 
 def test_streaming_standardiser_rejects_empty_input():
-    from ztb.features.builder import StandardiserAccumulator
+    from sentinel.features.builder import StandardiserAccumulator
 
     with pytest.raises(ValueError, match="no rows"):
         StandardiserAccumulator().finalize()

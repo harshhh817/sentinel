@@ -13,9 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from build_dataset import boundaries_from, build, corpus_start  # noqa: E402
 
+from sentinel.config import SPLIT_MONTHS  # noqa: E402
+from sentinel.features.builder import FEATURE_NAMES  # noqa: E402
 from tests.fixtures import write_corpus  # noqa: E402
-from ztb.config import SPLIT_MONTHS  # noqa: E402
-from ztb.features.builder import FEATURE_NAMES  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

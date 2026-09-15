@@ -32,10 +32,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import RESULTS  # noqa: E402
-from ztb.ledger.sim import LedgerRejected, SimLedger  # noqa: E402
-from ztb.pdp.chain import GENESIS, feature_digest, new_salt, record_hash, verify_chain  # noqa: E402
-from ztb.pdp.signer import Signer, Verifier  # noqa: E402
+from sentinel.config import RESULTS  # noqa: E402
+from sentinel.ledger.sim import LedgerRejected, SimLedger  # noqa: E402
+from sentinel.pdp.chain import (  # noqa: E402
+    GENESIS,
+    feature_digest,
+    new_salt,
+    record_hash,
+    verify_chain,
+)
+from sentinel.pdp.signer import Signer, Verifier  # noqa: E402
 
 KINDS = ("delete", "modify", "backdate", "fabricate")
 
@@ -44,7 +50,7 @@ def make_record(signer: Signer, principal: str, seq: int, prev: str, ts: datetim
                 verdict: str = "ALLOW") -> dict:
     rec = {"recId": str(uuid.uuid4()), "prevHash": prev, "seq": seq, "ts": ts.isoformat(),
            "principal": principal, "action": "s3:GetObject",
-           "resource": f"arn:aws:s3:::ztb-sales/docs/{seq % 50}.pdf",
+           "resource": f"arn:aws:s3:::sentinel-sales/docs/{seq % 50}.pdf",
            "r": round(random.random(), 8), "R": round(random.random(), 8), "verdict": verdict,
            "h_feat": feature_digest(None, new_salt())}
     rec["sig"] = signer.sign_record(rec)
@@ -128,7 +134,7 @@ def run(ledger_kind: str, n_attempts: int, control: int, seed: int, shim_url: st
     if ledger_kind == "sim":
         ledger = SimLedger(verifier)
     elif ledger_kind == "fabric":
-        from ztb.ledger.client import FabricLedger
+        from sentinel.ledger.client import FabricLedger
 
         ledger = FabricLedger(shim_url) if shim_url else FabricLedger()
         try:
@@ -236,7 +242,7 @@ def _admin(ledger, op: str, rec: dict) -> None:
     if not COUCHDB:
         raise SystemExit("--couchdb is required for fabric-mode tampering "
                          "(e.g. http://admin:adminpw@localhost:5984/mychannel_auditcontract)")
-    from ztb.ledger.couchdb import CouchDBAdmin
+    from sentinel.ledger.couchdb import CouchDBAdmin
 
     admin = CouchDBAdmin(COUCHDB)
     if op == "delete":

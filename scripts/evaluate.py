@@ -25,12 +25,12 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import DATA_PROCESSED, MODELS, RESULTS  # noqa: E402
-from ztb.risk.baselines import SUPERVISED, baseline_risk, fit_baseline  # noqa: E402
-from ztb.risk.data import load_split  # noqa: E402
-from ztb.risk.fusion import fuse, load_engine, seeds_available  # noqa: E402
-from ztb.risk.metrics import at_threshold, best_f1_threshold, summarise  # noqa: E402
-from ztb.risk.trust import DENY_THRESHOLD, effective_risk  # noqa: E402
+from sentinel.config import DATA_PROCESSED, MODELS, RESULTS  # noqa: E402
+from sentinel.risk.baselines import SUPERVISED, baseline_risk, fit_baseline  # noqa: E402
+from sentinel.risk.data import load_split  # noqa: E402
+from sentinel.risk.fusion import fuse, load_engine, seeds_available  # noqa: E402
+from sentinel.risk.metrics import at_threshold, best_f1_threshold, summarise  # noqa: E402
+from sentinel.risk.trust import DENY_THRESHOLD, effective_risk  # noqa: E402
 
 MODEL_ORDER = ("logistic_regression", "random_forest", "isolation_forest",
                "autoencoder", "hybrid")
@@ -73,7 +73,7 @@ def supervised_training_set(data: Path, seed: int, subsample: int):
 
 def _positives_only(split):
     m = split.y == 1
-    from ztb.risk.data import Split
+    from sentinel.risk.data import Split
     return Split(split.x[m], split.y[m], split.sensitivity[m], split.credit[m])
 
 
@@ -144,7 +144,7 @@ def evaluate(
 
 
 def _select(x: np.ndarray, engine) -> np.ndarray:
-    from ztb.features.builder import FEATURE_NAMES
+    from sentinel.features.builder import FEATURE_NAMES
     if engine.feature_names == FEATURE_NAMES:
         return x
     return x[:, [FEATURE_NAMES.index(f) for f in engine.feature_names]]

@@ -2,8 +2,8 @@
 
 Numbers are from `results/`; every one is produced by a script.
 
-**1. What does ZTBAudit add over IAM?**
-IAM answers "is this principal entitled?" once, from a static policy. ZTBAudit re-evaluates every
+**1. What does Sentinel (the ZTBAudit architecture) add over IAM?**
+IAM answers "is this principal entitled?" once, from a static policy. Sentinel re-evaluates every
 request against the principal's own behavioural baseline, issues short-lived least-privilege
 credentials sized to the risk, and binds the score, feature digest and verdict into a signed,
 hash-chained record on a ledger no single administrator controls. Replayed CERT scenarios are

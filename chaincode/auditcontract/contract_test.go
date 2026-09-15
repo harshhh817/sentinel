@@ -14,7 +14,7 @@ import (
 	"github.com/hyperledger/fabric-protos-go/ledger/queryresult"
 )
 
-// ---------------- vectors produced by ztb/pdp/signer.py ----------------
+// ---------------- vectors produced by sentinel/pdp/signer.py ----------------
 
 type vectors struct {
 	PDPPublicKeyPEM string `json:"pdp_public_key_pem"`

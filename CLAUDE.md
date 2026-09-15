@@ -1,9 +1,11 @@
-# ZTBAudit — Project Spec
+# Sentinel — Project Spec
+
+Sentinel implements the **ZTBAudit** architecture from the paper below; the project, package and all user-facing names are *Sentinel*, and "ZTBAudit" is used only when referring to the paper.
 
 Implementation of the paper **"AI-Driven Zero-Trust Cloud Access Control with Blockchain-Anchored Audit Trails: An AWS-Based Architecture"** (Gupta, Shivam, Aditya, Naaz, Kumar — Sharda University). The PDF is in this folder; read it before any non-trivial change.
 
 ## Goal
-Working, demo-able prototype of ZTBAudit that reproduces the paper's pipeline end to end on a laptop (local mode) with an optional AWS deployment (cloud mode). Final-year B.Tech project — correctness and a clean demo matter more than scale.
+Working, demo-able prototype of the ZTBAudit architecture (as *Sentinel*) that reproduces the paper's pipeline end to end on a laptop (local mode) with an optional AWS deployment (cloud mode). Final-year B.Tech project — correctness and a clean demo matter more than scale.
 
 ## Owner context
 - Team: Harsh Gupta (lead), Shivam, Aditya. Guides: Sheenam Naaz, Kapil Kumar.
@@ -59,10 +61,10 @@ Hybrid F1 ≈ 0.93, AUC ≈ 0.96, FPR ≈ 0.4 % at R ≥ 0.85; ablations (no iFo
 
 ## Repo layout
 ```
-ztbaudit/
+sentinel/
   CLAUDE.md  PLAN.md  README.md  paper.pdf
   data/            raw CERT (gitignored), processed parquet
-  ztb/
+  sentinel/
     features/      CERT→CloudTrail mapper, feature builder, baseline store
     risk/          autoencoder.py, iforest.py, fusion.py, trust.py
     pdp/           FastAPI app implementing Algorithm 1, signer, hash chain, queue

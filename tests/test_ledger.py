@@ -18,10 +18,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from tamper_test import make_record  # noqa: E402
 from tamper_test import run as tamper_run
 
-from ztb.ledger.client import FabricLedger  # noqa: E402
-from ztb.ledger.sim import LedgerRejected, SimLedger  # noqa: E402
-from ztb.pdp.chain import GENESIS, record_hash  # noqa: E402
-from ztb.pdp.signer import Signer, Verifier  # noqa: E402
+from sentinel.ledger.client import FabricLedger  # noqa: E402
+from sentinel.ledger.sim import LedgerRejected, SimLedger  # noqa: E402
+from sentinel.pdp.chain import GENESIS, record_hash  # noqa: E402
+from sentinel.pdp.signer import Signer, Verifier  # noqa: E402
 
 
 @pytest.fixture
@@ -114,10 +114,10 @@ def test_verifychain_locates_deletion_modification_and_truncated_tail(pdp):
 def test_pdp_commits_through_sim_ledger_and_counts_rejections(tmp_path):
     from fastapi.testclient import TestClient
 
+    from sentinel.pdp.app import create_app
+    from sentinel.pdp.settings import Settings
+    from sentinel.risk.fusion import RiskEngine
     from tests.test_pdp import SCRATCH_MODELS, StubEngine, req
-    from ztb.pdp.app import create_app
-    from ztb.pdp.settings import Settings
-    from ztb.risk.fusion import RiskEngine
 
     models = SCRATCH_MODELS if (SCRATCH_MODELS / "engine_seed0.json").exists() else Path("models")
     if not (models / "engine_seed0.json").exists():

@@ -1,4 +1,4 @@
-# ZTBAudit — see PLAN.md for the module order.
+# Sentinel — see PLAN.md for the module order.
 # Local mode is the default; nothing here needs AWS.
 
 PYTHON      ?= python3.11
@@ -17,7 +17,7 @@ CAFF        := $(shell command -v caffeinate 2> /dev/null)
 KEEPAWAKE   := $(if $(CAFF),caffeinate -dims,)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup test lint sample dataset train eval ablation latency tamper demo demo-check demo-scenario serve clean
+.PHONY: help setup test lint sample dataset train eval ablation latency tamper demo demo-bootstrap demo-check demo-scenario serve clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -63,10 +63,13 @@ tamper: ## Table VII — 500 tamper attempts + 10k clean control run
 	$(KEEPAWAKE) $(BIN)/python scripts/tamper_test.py
 
 serve: ## Run the PDP locally on :8000
-	$(BIN)/uvicorn ztb.pdp.app:app --reload --port 8000
+	$(BIN)/uvicorn sentinel.pdp.app:app --reload --port 8000
 
-demo: ## Split-screen dashboard: Plain IAM vs ZTBAudit over one CERT insider (Streamlit)
-	$(BIN)/streamlit run ztb/demo/app.py
+demo: demo-bootstrap ## Split-screen dashboard: Plain IAM vs Sentinel over one insider (Streamlit)
+	$(BIN)/streamlit run sentinel/demo/app.py
+
+demo-bootstrap: ## Synthesise models + scenario when the CERT-trained ones are absent (fresh clone)
+	$(BIN)/python scripts/demo_bootstrap.py
 
 demo-check: ## Verify Docker, Fabric network, shim, models and scenario before the demo
 	$(BIN)/python scripts/demo_check.py

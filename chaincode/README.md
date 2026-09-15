@@ -3,7 +3,7 @@
 `auditcontract/` is the Go chaincode of Section IV-E: `LogAccess`, `QueryByPrincipal`,
 `QueryByResource`, `VerifyChain`, plus a one-time `SetPDPPublicKey`. There is no update or delete
 transaction. `LogAccess` verifies the PDP's ECDSA-P-256 signature over the canonical record
-(`canonical.go` is a byte-exact port of `ztb/pdp/signer.py`; the Go tests verify Python-made
+(`canonical.go` is a byte-exact port of `sentinel/pdp/signer.py`; the Go tests verify Python-made
 signatures from `testdata/vectors.json`), enforces per-principal `seq` continuity and `prevHash`,
 and rejects duplicate `recId`. `VerifyChain` re-walks a principal's chain and also checks the
 record count against the stored head, so a deleted *last* record is caught too.
@@ -36,9 +36,9 @@ empty build log; CCaaS avoids the in-peer build entirely.
 cd ~/fabric-samples/test-network
 ./network.sh down
 ./network.sh up createChannel -c mychannel -ca -s couchdb
-docker build -t auditcontract_ccaas_image:latest /Users/harshgupta/projects/ztbaudit/chaincode/auditcontract
+docker build -t auditcontract_ccaas_image:latest /Users/harshgupta/projects/sentinel/chaincode/auditcontract
 ./network.sh deployCCAAS -c mychannel -ccn auditcontract \
-    -ccp /Users/harshgupta/projects/ztbaudit/chaincode/auditcontract \
+    -ccp /Users/harshgupta/projects/sentinel/chaincode/auditcontract \
     -ccep "OR('Org1MSP.peer','Org2MSP.peer')"          # add -ccs N to redeploy a new image
 ```
 
@@ -54,8 +54,8 @@ and work on LevelDB too. The endorsement policy above is for the demo; the paper
 ## Gateway shim and the PDP
 
 ```bash
-cd ztb/ledger/shim && npm install && node server.js      # :7071, Org1 User1 identity
-ZTB_LEDGER=fabric make serve                              # PDP commits through the shim
+cd sentinel/ledger/shim && npm install && node server.js      # :7071, Org1 User1 identity
+SENTINEL_LEDGER=fabric make serve                              # PDP commits through the shim
 curl -s localhost:8000/verify/CDE1846
 ```
 
@@ -76,7 +76,7 @@ deletes the endorsing peer's CouchDB documents directly, behind the chaincode's 
 `VerifyChain` has to catch it from the state alone. Commits are parallelised across principals
 (each chain stays in order) because every Gateway submit waits ~2 s for block commit.
 
-Without Docker, `--ledger sim` runs both against `ztb/ledger/sim.py`, a Python reference
+Without Docker, `--ledger sim` runs both against `sentinel/ledger/sim.py`, a Python reference
 implementation of exactly the chaincode's rules; its Table VII is labelled `ledger=sim` and its
 throughput must not be reported as ledger throughput.
 

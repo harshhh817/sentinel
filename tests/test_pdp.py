@@ -15,19 +15,24 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+from sentinel.pdp import credentials  # noqa: E402
+from sentinel.pdp.app import PDP, create_app  # noqa: E402
+from sentinel.pdp.chain import (  # noqa: E402
+    EvidenceStore,
+    feature_digest,
+    record_hash,
+    verify_chain,
+)
+from sentinel.pdp.context import control_credit  # noqa: E402
+from sentinel.pdp.schemas import AuthContext  # noqa: E402
+from sentinel.pdp.settings import DEFAULT_POLICY, Settings  # noqa: E402
+from sentinel.pdp.signer import Signer, Verifier, canonical  # noqa: E402
+from sentinel.pdp.static_policy import StaticPolicy  # noqa: E402
+from sentinel.risk.fusion import RiskEngine, Scores  # noqa: E402
+from sentinel.risk.trust import effective_risk  # noqa: E402
 from tests.fixtures import write_synthetic_splits  # noqa: E402
-from ztb.pdp import credentials  # noqa: E402
-from ztb.pdp.app import PDP, create_app  # noqa: E402
-from ztb.pdp.chain import EvidenceStore, feature_digest, record_hash, verify_chain  # noqa: E402
-from ztb.pdp.context import control_credit  # noqa: E402
-from ztb.pdp.schemas import AuthContext  # noqa: E402
-from ztb.pdp.settings import DEFAULT_POLICY, Settings  # noqa: E402
-from ztb.pdp.signer import Signer, Verifier, canonical  # noqa: E402
-from ztb.pdp.static_policy import StaticPolicy  # noqa: E402
-from ztb.risk.fusion import RiskEngine, Scores  # noqa: E402
-from ztb.risk.trust import effective_risk  # noqa: E402
 
-SCRATCH_MODELS = Path("/private/tmp/claude-501/-Users-harshgupta-projects-ztbaudit/"
+SCRATCH_MODELS = Path("/private/tmp/claude-501/-Users-harshgupta-projects-sentinel/"
                       "233e123e-8932-4383-b8c3-6c14df95f585/scratchpad/m2/models")
 
 
@@ -73,7 +78,7 @@ def make_client(tmp_path: Path, models: Path, r: float | None = None) -> TestCli
 
 
 def req(principal="CDE1846", action="s3:GetObject",
-        resource="arn:aws:s3:::ztb-sales/docs/q3.pdf", **ctx) -> dict:
+        resource="arn:aws:s3:::sentinel-sales/docs/q3.pdf", **ctx) -> dict:
     base = {"device_id": "PC-0001", "device_managed": True, "mfa_age_seconds": 60.0,
             "mfa_hardware_backed": True}
     base.update(ctx)
@@ -142,7 +147,7 @@ def test_deny_path_no_credential_no_baseline_update_but_record_written(tmp_path,
 
 def test_static_deny_is_final_and_precedes_scoring(tmp_path, models):
     with make_client(tmp_path, models, r=0.0) as c:          # r=0 would otherwise ALLOW
-        body = c.post("/authorize", json=req(resource="arn:aws:s3:::ztb-research/x")).json()
+        body = c.post("/authorize", json=req(resource="arn:aws:s3:::sentinel-research/x")).json()
         assert body["verdict"] == "DENY" and body["reason"].startswith("static policy")
         assert body["risk"]["r"] is None and "inference" not in body["timings_ms"]
         rec = body["record"]
@@ -182,17 +187,17 @@ def test_control_credit_from_auth_context():
 
 def test_static_policy_rbac_abac():
     pol = StaticPolicy.load(DEFAULT_POLICY)
-    ok, _ = pol.permitted("CDE1846", "s3:GetObject", "arn:aws:s3:::ztb-sales/x")
+    ok, _ = pol.permitted("CDE1846", "s3:GetObject", "arn:aws:s3:::sentinel-sales/x")
     assert ok
-    ok, why = pol.permitted("CDE1846", "s3:GetObject", "arn:aws:s3:::ztb-research/x")
+    ok, why = pol.permitted("CDE1846", "s3:GetObject", "arn:aws:s3:::sentinel-research/x")
     assert not ok and "unit bucket" in why
-    ok, _ = pol.permitted("AAM0658", "s3:GetObject", "arn:aws:s3:::ztb-research/x")
+    ok, _ = pol.permitted("AAM0658", "s3:GetObject", "arn:aws:s3:::sentinel-research/x")
     assert ok                                                # ITAdmin: any bucket
-    ok, _ = pol.permitted("CDE1846", "s3:DeleteBucket", "arn:aws:s3:::ztb-sales")
+    ok, _ = pol.permitted("CDE1846", "s3:DeleteBucket", "arn:aws:s3:::sentinel-sales")
     assert not ok                                            # deny by default
     ok, _ = pol.permitted("NOBODY", "execute-api:Invoke", "arn:aws:execute-api:::x")
     assert ok                                                # default role
-    assert pol.sensitivity("arn:aws:s3:::ztb-sales/removable/PC-1") == 1.0
+    assert pol.sensitivity("arn:aws:s3:::sentinel-sales/removable/PC-1") == 1.0
     assert pol.sensitivity("arn:aws:iam::0:role/x") == 0.3
 
 
@@ -273,7 +278,8 @@ def test_chain_across_requests_and_verify_endpoint(tmp_path, models):
     with make_client(tmp_path, models, r=0.05) as c:
         for _ in range(5):
             c.post("/authorize", json=req())
-        c.post("/authorize", json=req(principal="AAM0658", resource="arn:aws:s3:::ztb-research/y"))
+        c.post("/authorize",
+               json=req(principal="AAM0658", resource="arn:aws:s3:::sentinel-research/y"))
         recs = c.get("/records/CDE1846").json()
         assert [r["seq"] for r in recs] == [1, 2, 3, 4, 5]
         for a, b in zip(recs, recs[1:], strict=False):

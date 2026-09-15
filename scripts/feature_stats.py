@@ -18,8 +18,8 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import DATA_PROCESSED, RESULTS  # noqa: E402
-from ztb.features.builder import FEATURE_NAMES  # noqa: E402
+from sentinel.config import DATA_PROCESSED, RESULTS  # noqa: E402
+from sentinel.features.builder import FEATURE_NAMES  # noqa: E402
 
 
 def summarise(path: Path) -> dict[str, dict[str, float]]:

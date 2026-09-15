@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import MODELS, ROOT  # noqa: E402
+from sentinel.config import MODELS, ROOT  # noqa: E402
 
 OK, WARN, FAIL = "✅", "⚠️ ", "❌"
 
@@ -94,9 +94,9 @@ def main() -> int:
             v = json.loads(r.read())
         opt(v.get("intact") is True, "VerifyChain answers on the live chain")
     except Exception as e:  # noqa: BLE001
-        opt(False, "gateway shim on :7071", f"cd ztb/ledger/shim && node server.js ({e})")
+        opt(False, "gateway shim on :7071", f"cd sentinel/ledger/shim && node server.js ({e})")
     try:
-        from ztb.ledger.couchdb import CouchDBAdmin
+        from sentinel.ledger.couchdb import CouchDBAdmin
 
         opt(CouchDBAdmin().reachable(), "CouchDB admin access for Cover-tracks",
             "couchdb0 on :5984")

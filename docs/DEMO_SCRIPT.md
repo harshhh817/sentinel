@@ -6,7 +6,7 @@ speed slider at 1 day/s. The scenario is CERT insider **HBO0413**: 4,578 request
 
 ## 0:00 — Frame it (no clicks)
 > "Same user, same 42 days, two systems. Left is what AWS IAM does today: entitlement only. Right
-> is ZTBAudit: every request scored against the user's own baseline, decision bound to a ledger."
+> is Sentinel: every request scored against the user's own baseline, decision bound to a ledger."
 
 Point at the sidebar: `ledger: fabric · committed · pending`. "That's a live Hyperledger Fabric
 network on this laptop; the ledger lags the replay because each record waits for its block —
@@ -23,7 +23,7 @@ says exactly why."
 ## 1:15 — Press **▶ play**, let it run into the scenario window
 Watch the gauge climb and DENY/STEP-UP counts appear on the right; the left keeps saying ALLOW.
 > "Here's the insider's copying to removable media and visiting job/leak sites. IAM allows every
-> one of these — the user is entitled. ZTBAudit steps up, then denies, and issues nothing."
+> one of these — the user is entitled. Sentinel steps up, then denies, and issues nothing."
 
 Pause (**⏸**) on a red day. Read the top-3 features aloud (after-hours fraction, egress counts,
 event count). "Those are the day-level signals; the request-level score is propagated as the max."
@@ -55,5 +55,5 @@ caught in the experiment, zero false alarms on 10,000 clean records."
   ledger. Say so; the mechanics are identical.
 - Cover tracks greyed out — fewer than 6 records committed yet; step one more day or wait ~15 s.
 - `rejected > 0` in the sidebar — restart the demo (**reset**); chains are per session.
-- Recovery commands: `make demo-check`; shim: `cd ztb/ledger/shim && node server.js`; network:
+- Recovery commands: `make demo-check`; shim: `cd sentinel/ledger/shim && node server.js`; network:
   `chaincode/README.md`.

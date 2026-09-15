@@ -22,10 +22,10 @@ from sklearn.metrics import roc_auc_score
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import DATA_PROCESSED, MODELS, RESULTS  # noqa: E402
-from ztb.features.builder import FEATURE_NAMES  # noqa: E402
-from ztb.risk.data import load_split  # noqa: E402
-from ztb.risk.fusion import load_engine  # noqa: E402
+from sentinel.config import DATA_PROCESSED, MODELS, RESULTS  # noqa: E402
+from sentinel.features.builder import FEATURE_NAMES  # noqa: E402
+from sentinel.risk.data import load_split  # noqa: E402
+from sentinel.risk.fusion import load_engine  # noqa: E402
 
 IDX = {n: i for i, n in enumerate(FEATURE_NAMES)}
 

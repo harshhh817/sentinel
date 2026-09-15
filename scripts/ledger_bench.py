@@ -29,10 +29,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from tamper_test import make_record  # noqa: E402
 
-from ztb.config import RESULTS  # noqa: E402
-from ztb.ledger.sim import LedgerRejected, SimLedger  # noqa: E402
-from ztb.pdp.chain import GENESIS, record_hash  # noqa: E402
-from ztb.pdp.signer import Signer, Verifier  # noqa: E402
+from sentinel.config import RESULTS  # noqa: E402
+from sentinel.ledger.sim import LedgerRejected, SimLedger  # noqa: E402
+from sentinel.pdp.chain import GENESIS, record_hash  # noqa: E402
+from sentinel.pdp.signer import Signer, Verifier  # noqa: E402
 
 
 class Principals:
@@ -130,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.ledger == "sim":
         ledger = SimLedger(Verifier.from_signer(pdp))
     else:
-        from ztb.ledger.client import FabricLedger
+        from sentinel.ledger.client import FabricLedger
 
         ledger = FabricLedger(a.shim) if a.shim else FabricLedger()
         try:

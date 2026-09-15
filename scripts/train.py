@@ -25,13 +25,13 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import DATA_PROCESSED, FUSION_ALPHA, MODELS, SEEDS  # noqa: E402
-from ztb.features.builder import FEATURE_NAMES, Standardiser  # noqa: E402
-from ztb.risk.autoencoder import AEConfig, train_autoencoder  # noqa: E402
-from ztb.risk.data import Split, load_split, load_standardiser  # noqa: E402
-from ztb.risk.fusion import EmpiricalCDF, PerSourceEngine, RiskEngine  # noqa: E402
-from ztb.risk.iforest import isolation_score, train_iforest  # noqa: E402
-from ztb.risk.types import EVENT_TYPES  # noqa: E402
+from sentinel.config import DATA_PROCESSED, FUSION_ALPHA, MODELS, SEEDS  # noqa: E402
+from sentinel.features.builder import FEATURE_NAMES, Standardiser  # noqa: E402
+from sentinel.risk.autoencoder import AEConfig, train_autoencoder  # noqa: E402
+from sentinel.risk.data import Split, load_split, load_standardiser  # noqa: E402
+from sentinel.risk.fusion import EmpiricalCDF, PerSourceEngine, RiskEngine  # noqa: E402
+from sentinel.risk.iforest import isolation_score, train_iforest  # noqa: E402
+from sentinel.risk.types import EVENT_TYPES  # noqa: E402
 
 Preprocess = Callable[[Split], np.ndarray]
 

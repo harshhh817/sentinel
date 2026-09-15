@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import RESULTS  # noqa: E402
+from sentinel.config import RESULTS  # noqa: E402
 
 COLS = ("auc", "f1", "fpr_pct", "tuned_f1", "tuned_fpr_pct")
 

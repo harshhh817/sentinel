@@ -24,9 +24,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import MODELS, RESULTS  # noqa: E402
-from ztb.pdp.app import create_app  # noqa: E402
-from ztb.pdp.settings import Settings  # noqa: E402
+from sentinel.config import MODELS, RESULTS  # noqa: E402
+from sentinel.pdp.app import create_app  # noqa: E402
+from sentinel.pdp.settings import Settings  # noqa: E402
 
 STAGES = ("static_policy", "feature_assembly", "inference", "trust", "credential",
           "record_sign_enqueue", "baseline_update", "total")
@@ -38,10 +38,10 @@ def synthetic_request(rng: random.Random, i: int) -> dict:
     unit = "sales"
     action = rng.choice(ACTIONS)
     resource = {
-        "s3:GetObject": f"arn:aws:s3:::ztb-{unit}/docs/{rng.randrange(500)}.pdf",
-        "s3:PutObject": f"arn:aws:s3:::ztb-{unit}/docs/{rng.randrange(500)}.pdf",
+        "s3:GetObject": f"arn:aws:s3:::sentinel-{unit}/docs/{rng.randrange(500)}.pdf",
+        "s3:PutObject": f"arn:aws:s3:::sentinel-{unit}/docs/{rng.randrange(500)}.pdf",
         "execute-api:Invoke": f"arn:aws:execute-api:::site-{rng.randrange(50)}",
-        "sts:AssumeRole": "arn:aws:iam::000000000000:role/ztb-sales-session",
+        "sts:AssumeRole": "arn:aws:iam::000000000000:role/sentinel-sales-session",
     }[action]
     return {"principal": principal, "action": action, "resource": resource,
             "context": {"device_id": f"PC-{rng.randrange(300):04d}", "device_managed": True,
@@ -115,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ledger", choices=["jsonl", "sim", "fabric"], default="jsonl")
     a = ap.parse_args(argv)
 
-    state = a.state_dir or Path(tempfile.mkdtemp(prefix="ztb-bench-"))
+    state = a.state_dir or Path(tempfile.mkdtemp(prefix="sentinel-bench-"))
     timings, meta = asyncio.run(run(a.models, a.n, a.rps, a.seed, a.policy, state, a.ledger))
     rows = summarise(timings)
     a.out.mkdir(parents=True, exist_ok=True)

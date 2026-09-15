@@ -30,13 +30,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from train import train_engine  # noqa: E402
 
-from ztb.config import DATA_PROCESSED, FUSION_ALPHA, MODELS, RESULTS  # noqa: E402
-from ztb.features.builder import FEATURE_NAMES, VOLUME_FEATURES  # noqa: E402
-from ztb.risk.autoencoder import AEConfig  # noqa: E402
-from ztb.risk.data import Split, feature_index, load_split  # noqa: E402
-from ztb.risk.fusion import PerSourceEngine, fuse, load_engine, seeds_available  # noqa: E402
-from ztb.risk.metrics import at_threshold, best_f1_threshold, summarise  # noqa: E402
-from ztb.risk.trust import DENY_THRESHOLD, effective_risk  # noqa: E402
+from sentinel.config import DATA_PROCESSED, FUSION_ALPHA, MODELS, RESULTS  # noqa: E402
+from sentinel.features.builder import FEATURE_NAMES, VOLUME_FEATURES  # noqa: E402
+from sentinel.risk.autoencoder import AEConfig  # noqa: E402
+from sentinel.risk.data import Split, feature_index, load_split  # noqa: E402
+from sentinel.risk.fusion import PerSourceEngine, fuse, load_engine, seeds_available  # noqa: E402
+from sentinel.risk.metrics import at_threshold, best_f1_threshold, summarise  # noqa: E402
+from sentinel.risk.trust import DENY_THRESHOLD, effective_risk  # noqa: E402
 
 VARIANTS = (
     ("full", "Full system (alpha = 0.6)"),

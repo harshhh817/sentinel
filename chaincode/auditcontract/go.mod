@@ -1,4 +1,4 @@
-module github.com/harshgupta/ztbaudit/chaincode/auditcontract
+module github.com/harshhh817/sentinel/chaincode/auditcontract
 
 go 1.22
 

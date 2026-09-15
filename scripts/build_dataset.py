@@ -31,16 +31,16 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import DATA_PROCESSED, DATA_RAW, MODELS, RESULTS, SPLIT_MONTHS  # noqa: E402
-from ztb.features.baseline import BaselineStore  # noqa: E402
-from ztb.features.builder import (  # noqa: E402
+from sentinel.config import DATA_PROCESSED, DATA_RAW, MODELS, RESULTS, SPLIT_MONTHS  # noqa: E402
+from sentinel.features.baseline import BaselineStore  # noqa: E402
+from sentinel.features.builder import (  # noqa: E402
     FEATURE_NAMES,
     StandardiserAccumulator,
     build_vector,
     observe_event,
 )
-from ztb.features.cert_mapper import load_org_units, stream_events  # noqa: E402
-from ztb.features.labels import label_report, load_labels  # noqa: E402
+from sentinel.features.cert_mapper import load_org_units, stream_events  # noqa: E402
+from sentinel.features.labels import label_report, load_labels  # noqa: E402
 
 BATCH_ROWS = 10_000
 # Average days per month, used to place the split boundaries from the corpus start.

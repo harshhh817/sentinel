@@ -1,6 +1,6 @@
-// Package main implements the ZTBAudit audit contract (Section IV-E of the paper).
+// Package main implements the Sentinel audit contract (Section IV-E of the paper).
 //
-// canonical.go is a byte-exact port of ztb/pdp/signer.py: the ECDSA signature made by
+// canonical.go is a byte-exact port of sentinel/pdp/signer.py: the ECDSA signature made by
 // the PDP in Python must verify here, so the canonical encoding of the record tuple
 // has to produce identical bytes. Rules: the eleven signed fields in sorted key order,
 // no whitespace, floats rounded to 8 decimals and printed the way Python's repr()
@@ -132,7 +132,7 @@ func Canonical(rec *AuditRecord) []byte {
 	return []byte(b.String())
 }
 
-// RecordHash mirrors ztb.pdp.chain.record_hash: SHA-256(canonical || sig).
+// RecordHash mirrors sentinel.pdp.chain.record_hash: SHA-256(canonical || sig).
 func RecordHash(rec *AuditRecord) string {
 	h := sha256.New()
 	h.Write(Canonical(rec))

@@ -12,14 +12,19 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+from sentinel.config import (  # noqa: E402
+    BANDS,
+    FUSION_ALPHA,
+    IFOREST_MAX_SAMPLES,
+    IFOREST_N_ESTIMATORS,
+)
+from sentinel.features.builder import FEATURE_NAMES  # noqa: E402
+from sentinel.risk.autoencoder import AEConfig, AutoEncoder, train_autoencoder  # noqa: E402
+from sentinel.risk.fusion import EmpiricalCDF, RiskEngine, fuse  # noqa: E402
+from sentinel.risk.iforest import isolation_score, train_iforest  # noqa: E402
+from sentinel.risk.metrics import at_threshold, best_f1_threshold  # noqa: E402
+from sentinel.risk.trust import DENY_THRESHOLD, band_lookup, effective_risk, verdicts  # noqa: E402
 from tests.fixtures import write_synthetic_splits  # noqa: E402
-from ztb.config import BANDS, FUSION_ALPHA, IFOREST_MAX_SAMPLES, IFOREST_N_ESTIMATORS  # noqa: E402
-from ztb.features.builder import FEATURE_NAMES  # noqa: E402
-from ztb.risk.autoencoder import AEConfig, AutoEncoder, train_autoencoder  # noqa: E402
-from ztb.risk.fusion import EmpiricalCDF, RiskEngine, fuse  # noqa: E402
-from ztb.risk.iforest import isolation_score, train_iforest  # noqa: E402
-from ztb.risk.metrics import at_threshold, best_f1_threshold  # noqa: E402
-from ztb.risk.trust import DENY_THRESHOLD, band_lookup, effective_risk, verdicts  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -198,7 +203,7 @@ def test_metrics_at_threshold_and_tuned_threshold():
 
 
 def test_train_saves_a_loadable_engine_with_identical_scores(trained, synth):
-    from ztb.risk.data import load_split
+    from sentinel.risk.data import load_split
 
     eng = RiskEngine.load(trained, 0)
     assert eng.feature_names == FEATURE_NAMES and eng.alpha == FUSION_ALPHA
@@ -241,7 +246,7 @@ def test_ablation_writes_eight_rows(trained, synth, tmp_path):
 
 def test_cert_replay_grants_no_control_credit():
     """CERT has no MFA/managed-device evidence, so c must be 0 (else R caps at 0.75)."""
-    from ztb.risk.data import control_credit_from_features
+    from sentinel.risk.data import control_credit_from_features
 
     x = np.random.default_rng(0).normal(size=(10, 34)).astype(np.float32)
     assert (control_credit_from_features(x) == 0).all()
@@ -252,7 +257,7 @@ def test_cert_replay_grants_no_control_credit():
 
 
 def test_event_type_derivation():
-    from ztb.risk.types import event_type, event_type_one
+    from sentinel.risk.types import event_type, event_type_one
 
     a = np.array(["sts:AssumeRole", "sts:SessionEnd", "s3:GetObject", "s3:GetObject",
                   "s3:PutObject", "s3:PutObject", "execute-api:Invoke"])
@@ -264,7 +269,7 @@ def test_event_type_derivation():
 
 
 def test_split_loader_derives_types(synth):
-    from ztb.risk.data import load_split
+    from sentinel.risk.data import load_split
 
     val = load_split(synth["out_dir"] / "val.parquet", with_types=True)
     assert val.types is not None and len(val.types) == len(val)
@@ -275,7 +280,7 @@ def test_split_loader_derives_types(synth):
 
 def test_per_type_calibration_is_uniform_within_each_type(trained, synth):
     """The point of the change: benign r ~ U(0,1) inside every event type."""
-    from ztb.risk.data import load_split
+    from sentinel.risk.data import load_split
 
     eng = RiskEngine.load(trained, 0)
     val = load_split(synth["out_dir"] / "val.parquet", with_types=True).benign
@@ -291,7 +296,7 @@ def test_per_type_calibration_is_uniform_within_each_type(trained, synth):
 
 
 def test_per_source_calibration_survives_save_load(trained, synth, tmp_path):
-    from ztb.risk.data import load_split
+    from sentinel.risk.data import load_split
 
     eng = RiskEngine.load(trained, 0)
     val = load_split(synth["out_dir"] / "val.parquet", with_types=True).benign
@@ -307,7 +312,7 @@ def test_per_source_calibration_survives_save_load(trained, synth, tmp_path):
 def test_train_recalibrate_and_per_source_models(synth, tmp_path):
     from train import main as train_main
 
-    from ztb.risk.fusion import PerSourceEngine, load_engine
+    from sentinel.risk.fusion import PerSourceEngine, load_engine
 
     m1 = tmp_path / "m1"
     assert train_main(["--data", str(synth["out_dir"]), "--models", str(m1), "--seeds", "0",
@@ -322,7 +327,7 @@ def test_train_recalibrate_and_per_source_models(synth, tmp_path):
                        "--epochs", "5", "--per-source-models", "--device", "cpu"]) == 0
     eng = load_engine(m2, 0)
     assert isinstance(eng, PerSourceEngine) and eng.calibration == "per_source_models"
-    from ztb.risk.data import load_split
+    from sentinel.risk.data import load_split
 
     test = load_split(synth["out_dir"] / "test.parquet", with_types=True)
     r = eng.score(test.x, types=test.types).r
@@ -358,7 +363,7 @@ def test_evaluate_and_compare_across_variants(trained, synth, tmp_path):
 def test_userday_aggregation_counts_means_maxes_and_labels(synth, tmp_path):
     import pyarrow.parquet as pq
 
-    from ztb.risk.userday import N_USERDAY, USERDAY_FEATURES, aggregate, load, save
+    from sentinel.risk.userday import N_USERDAY, USERDAY_FEATURES, aggregate, load, save
 
     path = synth["out_dir"] / "test.parquet"
     ud = aggregate(path)

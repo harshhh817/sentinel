@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """User-day granularity: aggregate, train, score, and propagate -> --out/.
 
-1. Aggregate each split into (principal, day) vectors (ztb.risk.userday).
+1. Aggregate each split into (principal, day) vectors (sentinel.risk.userday).
 2. Train the same autoencoder + isolation forest on benign user-days of the training
    window; calibrate on benign user-days of the calibration window; fuse with alpha.
 3. Table V at user-day granularity (a user-day is positive if any event is).
@@ -30,15 +30,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from evaluate import LABELS, MODEL_ORDER, _write_table_v, risk_scores  # noqa: E402
 
-from ztb.config import DATA_PROCESSED, FUSION_ALPHA, MODELS, RESULTS, SEEDS  # noqa: E402
-from ztb.risk.autoencoder import AEConfig, train_autoencoder  # noqa: E402
-from ztb.risk.baselines import SUPERVISED, baseline_risk, fit_baseline  # noqa: E402
-from ztb.risk.data import load_split  # noqa: E402
-from ztb.risk.fusion import EmpiricalCDF, RiskEngine, load_engine  # noqa: E402
-from ztb.risk.iforest import isolation_score, train_iforest  # noqa: E402
-from ztb.risk.metrics import at_threshold, best_f1_threshold, summarise  # noqa: E402
-from ztb.risk.trust import DENY_THRESHOLD, effective_risk  # noqa: E402
-from ztb.risk.userday import (  # noqa: E402
+from sentinel.config import DATA_PROCESSED, FUSION_ALPHA, MODELS, RESULTS, SEEDS  # noqa: E402
+from sentinel.risk.autoencoder import AEConfig, train_autoencoder  # noqa: E402
+from sentinel.risk.baselines import SUPERVISED, baseline_risk, fit_baseline  # noqa: E402
+from sentinel.risk.data import load_split  # noqa: E402
+from sentinel.risk.fusion import EmpiricalCDF, RiskEngine, load_engine  # noqa: E402
+from sentinel.risk.iforest import isolation_score, train_iforest  # noqa: E402
+from sentinel.risk.metrics import at_threshold, best_f1_threshold, summarise  # noqa: E402
+from sentinel.risk.trust import DENY_THRESHOLD, effective_risk  # noqa: E402
+from sentinel.risk.userday import (  # noqa: E402
     USERDAY_FEATURES,
     UserDays,
     aggregate,

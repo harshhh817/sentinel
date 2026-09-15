@@ -22,7 +22,7 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import DATA_PROCESSED, ROOT  # noqa: E402
+from sentinel.config import DATA_PROCESSED, ROOT  # noqa: E402
 
 
 def rank_insiders(path: Path, top: int = 8) -> list[dict]:

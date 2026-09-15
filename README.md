@@ -1,6 +1,6 @@
-# ZTBAudit
+# Sentinel
 
-Reference implementation of **"AI-Driven Zero-Trust Cloud Access Control with Blockchain-Anchored
+Implements the **ZTBAudit** architecture from **"AI-Driven Zero-Trust Cloud Access Control with Blockchain-Anchored
 Audit Trails: An AWS-Based Architecture"** — Harsh Gupta, Shivam, Aditya, Sheenam Naaz, Kapil Kumar
 (Sharda University). The paper is `paper.pdf` in this repo. Final-year B.Tech project: every
 component of the paper is built, every reported number is reproduced by a script in `results/`,
@@ -65,7 +65,7 @@ that fall inside the training window (`train_malicious.parquet`).
 ## How to run the demo (fresh clone)
 
 ```bash
-git clone <repo> ztbaudit && cd ztbaudit
+git clone <repo> sentinel && cd sentinel
 make setup                                   # Python 3.11 venv, pinned deps
 make test                                    # 44 tests, no network needed
 # models: either train (needs data/processed from `make dataset`) or unpack a models/ bundle
@@ -79,7 +79,7 @@ make demo                                    # Streamlit at http://localhost:850
 Live-ledger mode (optional, ~15 min the first time): install Docker Desktop, then follow
 `chaincode/README.md` — `install-fabric.sh`, `network.sh up createChannel -ca -s couchdb`, build the
 chaincode image, `deployCCAAS`, disable the peers' state cache, `npm install && node server.js` in
-`ztb/ledger/shim`. `make demo-check` reports which of these is missing; without them the demo
+`sentinel/ledger/shim`. `make demo-check` reports which of these is missing; without them the demo
 falls back to the in-process reference ledger with the same behaviour. `docs/DEMO_SCRIPT.md` is
 the five-minute runbook; `docs/VIVA.md` the examiner Q&A.
 
@@ -92,7 +92,7 @@ the five-minute runbook; `docs/VIVA.md` the examiner Q&A.
 | 2 | Risk engine, trust algorithm, Tables V and VI | **done — see Results** |
 | 3 | PEP/PDP FastAPI service, signing, hash chain, Fig. 5 | **done (local mode)** |
 | 4 | Fabric chaincode, committer, tamper experiment, Table VII | **done (chaincode tested; live network needs Docker)** |
-| 3b | Demo dashboard: Plain IAM vs ZTBAudit, one insider replayed day by day | **done** |
+| 3b | Demo dashboard: Plain IAM vs Sentinel, one insider replayed day by day | **done** |
 | 5 | AWS cloud mode (optional) | not started |
 
 See `PLAN.md` for the full task list per module.
@@ -107,12 +107,12 @@ make test      # run the test suite
 make help      # list every target
 ```
 
-Local mode is the default and needs no AWS account. Cloud mode is opt-in via `ZTB_MODE=cloud`.
+Local mode is the default and needs no AWS account. Cloud mode is opt-in via `SENTINEL_MODE=cloud`.
 
 ## Repository layout
 
 ```
-ztb/
+sentinel/
   config.py        constants from the paper (α, λ, β, bands, dimensions) — single source of truth
   features/        CERT→CloudTrail mapper, label attachment, baseline store, feature builder
   risk/            autoencoder.py, iforest.py, fusion.py, trust.py
@@ -168,10 +168,10 @@ source:
 - r4.2's `file.csv` has no `activity` column and its filenames are bare (0 of 445,581 rows carry
   a drive letter); every row is a file copied to removable media, so all file events map to
   `s3:GetObject` with the egress marker. r4.2 therefore has no source for `s3:PutObject`; the
-  paper's Get/Put split needs the `activity` column of r5.x+ — see `ztb/features/cert_mapper.py`.
+  paper's Get/Put split needs the `activity` column of r5.x+ — see `sentinel/features/cert_mapper.py`.
 - CERT carries no ASN, geolocation, device fingerprint or MFA data, so the five network-and-device
   features are synthesised deterministically from the originating host — see
-  `ztb/features/builder.py`.
+  `sentinel/features/builder.py`.
 
 ## Paper → script map
 
@@ -195,7 +195,7 @@ make eval DATA=/x OUT=/tmp/o    # any split directory with the build_dataset sch
 Two places where the implementation departs from the paper's text, both deliberate:
 
 - **eq. (4) as typeset**, `1 − (1−r)^(1+λs)·(1−βc)`, makes the compensating-control credit
-  *raise* risk (R = βc for a perfectly normal request). `ztb/risk/trust.py` implements the evident
+  *raise* risk (R = βc for a perfectly normal request). `sentinel/risk/trust.py` implements the evident
   intent, `[1 − (1−r)^(1+λs)]·(1−βc)`, and keeps `literal=True` for comparison.
 - **The supervised baselines** need malicious training rows, but the training window is benign-only
   by construction. `build_dataset` writes the scripted-scenario rows it removes from the training
@@ -348,11 +348,11 @@ per-source-calibration variant is in `results/per_source_calibration/table_vi.cs
 ## PDP service (Module 3, local mode)
 
 ```bash
-make serve                                   # ZTB_MODELS=models uvicorn ztb.pdp.app:app --port 8000
+make serve                                   # SENTINEL_MODELS=models uvicorn sentinel.pdp.app:app --port 8000
 make latency                                 # Fig. 5: 50k requests at 200 rps -> results/fig5.csv
 curl -s localhost:8000/authorize -H 'content-type: application/json' -d '{
   "principal": "CDE1846", "action": "s3:GetObject",
-  "resource": "arn:aws:s3:::ztb-sales/docs/q3.pdf",
+  "resource": "arn:aws:s3:::sentinel-sales/docs/q3.pdf",
   "context": {"device_id": "PC-0001", "device_managed": true,
               "mfa_age_seconds": 60, "mfa_hardware_backed": true}}'
 curl -s localhost:8000/records/CDE1846        # this principal's audit records, in seq order
@@ -360,8 +360,8 @@ curl -s localhost:8000/verify/CDE1846         # VerifyChain: first discontinuity
 ```
 
 `POST /authorize` implements Algorithm 1 line by line and returns the verdict, the scoped
-credential (signed mock token locally; STS behind `ZTB_MODE=cloud`), the signed audit record of
-eq. (5), the risk breakdown and per-stage timings. Static entitlement (`ztb/pdp/policies/*.json`,
+credential (signed mock token locally; STS behind `SENTINEL_MODE=cloud`), the signed audit record of
+eq. (5), the risk breakdown and per-stage timings. Static entitlement (`sentinel/pdp/policies/*.json`,
 RBAC + ABAC, deny-by-default) is evaluated first and a static denial is final. A STEP-UP verdict
 returns a signed challenge; presenting it as `step_up_token` on the retry counts as a fresh
 hardware-backed MFA on a managed device.
@@ -398,14 +398,14 @@ into an append-only JSONL ledger under `state/ledger/` until the Fabric client l
 
 ```bash
 make demo-scenario      # picks the test-window insider with the most scripted events -> demo/
-make demo               # streamlit run ztb/demo/app.py
+make demo               # streamlit run sentinel/demo/app.py
 ```
 
 Split screen over one CERT insider (`HBO0413`: 4,578 requests over 42 days, 229 scripted-malicious,
 removable-media + web), replayed day by day at an adjustable speed.
 
 - **Left, Plain IAM** — entitlement only: every request is ALLOW and the log is a mutable list.
-- **Right, ZTBAudit** — the operating configuration from the Progression section: the random
+- **Right, Sentinel** — the operating configuration from the Progression section: the random
   forest on the principal's user-day vector gives the day's risk (SHAP top-3 contributing features
   shown), propagated to each request as r′ = max(request-level r, day r), through eq. (4) and
   Table III into a live gauge and verdict colour; every request becomes a signed, hash-chained
@@ -419,7 +419,7 @@ sidebar shows `ledger: fabric`, committed / pending / rejected): each request's 
 chained and committed by an ordered background thread — the PDP's asynchronous committer — so the
 ledger lags the replay by the block cadence; "Cover tracks" then edits the endorsing peer's
 CouchDB directly and `VerifyChain` on that peer reports the break. Without the network it falls
-back to `ztb/ledger/sim.py`. The peers must run with the CouchDB state cache disabled for
+back to `sentinel/ledger/sim.py`. The peers must run with the CouchDB state cache disabled for
 direct edits to be visible immediately (see `chaincode/README.md`). The scenario parquet is
 derived from the licence-restricted corpus and is not committed; regenerate it with
 `make demo-scenario`.
@@ -429,14 +429,14 @@ derived from the licence-restricted corpus and is not committed; regenerate it w
 `chaincode/auditcontract/` (Go) implements `LogAccess`, `QueryByPrincipal`, `QueryByResource`,
 `VerifyChain` and a one-time `SetPDPPublicKey`; there is no update or delete. `LogAccess` verifies
 the PDP's ECDSA-P-256 signature over a byte-exact port of the PDP's canonical JSON (the Go tests
-verify signatures made by `ztb/pdp/signer.py`), enforces per-principal `seq` continuity and
+verify signatures made by `sentinel/pdp/signer.py`), enforces per-principal `seq` continuity and
 `prevHash`, and rejects duplicate `recId`. `VerifyChain` re-walks the chain and checks the record
 count against the stored head, so a deleted *last* record is caught as well as an interior one.
 
 ```bash
 cd chaincode/auditcontract && go test ./...             # no network needed
-ZTB_LEDGER=sim   make serve                              # reference ledger, in-process
-ZTB_LEDGER=fabric make serve                             # via ztb/ledger/shim (Node, Fabric Gateway)
+SENTINEL_LEDGER=sim   make serve                              # reference ledger, in-process
+SENTINEL_LEDGER=fabric make serve                             # via sentinel/ledger/shim (Node, Fabric Gateway)
 python scripts/tamper_test.py  --ledger sim|fabric       # Table VII
 python scripts/ledger_bench.py --ledger fabric           # Fig. 6
 ```

@@ -1,18 +1,18 @@
 """Module 0 smoke tests: the scaffold imports and the paper's constants are what the paper says."""
 
-import ztb
-from ztb import config
+import sentinel
+from sentinel import config
 
 
 def test_package_imports():
-    assert ztb.__version__
+    assert sentinel.__version__
 
 
 def test_subpackages_import():
-    import ztb.features  # noqa: F401
-    import ztb.ledger  # noqa: F401
-    import ztb.pdp  # noqa: F401
-    import ztb.risk  # noqa: F401
+    import sentinel.features  # noqa: F401
+    import sentinel.ledger  # noqa: F401
+    import sentinel.pdp  # noqa: F401
+    import sentinel.risk  # noqa: F401
 
 
 def test_feature_vector_is_34_dimensional():

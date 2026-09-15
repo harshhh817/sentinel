@@ -1,4 +1,4 @@
-# ZTBAudit — pinned dependencies (Python 3.11)
+# Sentinel — pinned dependencies (Python 3.11)
 # Versions follow Table IV of the paper: PyTorch 2.1, scikit-learn 1.4.
 
 # --- core numerics / data ---

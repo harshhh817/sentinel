@@ -22,9 +22,9 @@ from sklearn.metrics import roc_auc_score
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ztb.config import DATA_PROCESSED, MODELS, RESULTS  # noqa: E402
-from ztb.risk.data import load_split  # noqa: E402
-from ztb.risk.fusion import RiskEngine  # noqa: E402
+from sentinel.config import DATA_PROCESSED, MODELS, RESULTS  # noqa: E402
+from sentinel.risk.data import load_split  # noqa: E402
+from sentinel.risk.fusion import RiskEngine  # noqa: E402
 
 SOURCES = ("logon", "device", "file", "http")
 
