@@ -491,3 +491,7 @@ at ~0.3 tx/s because each waits for its block, so the experiment commits chains 
 - Results in this repo are reproductions on a laptop-scale testbed; the paper's figures come from
   an AWS deployment. Divergences are recorded in each module's report.
 - Nothing in `results/` is typed by hand — regenerate it with `make eval`.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Harsh Gupta, Shivam, Aditya. The CERT r4.2 dataset is not included and is subject to its own terms.
