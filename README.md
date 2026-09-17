@@ -162,6 +162,16 @@ training window.
 `data/raw` is a symlink to an external disk (the corpus is ~20 GB extracted) and is gitignored;
 `answers/` ships as a separate archive on KiltHub and must sit at `data/raw/r4.2/answers/`.
 
+> **Disk folder rename pending.** Both symlinks (`data/raw`, `data/processed`) now point at
+> `/Volumes/harsh hd/sentinel-data/`, renamed with the project. The folder on the external disk is
+> still `ztbaudit-data`, so the symlinks dangle until it is renamed to match:
+>
+> ```
+> mv "/Volumes/harsh hd/ztbaudit-data" "/Volumes/harsh hd/sentinel-data"
+> ```
+>
+> The symlinks themselves are gitignored and local to this working copy.
+
 Two points about the mapping, both verified against the real r4.2 files and documented in the
 source:
 
