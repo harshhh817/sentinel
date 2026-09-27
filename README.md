@@ -366,9 +366,11 @@ reaches AUC 0.85 at either granularity. A supervised user-day model does only wh
 labels from the months immediately before the test window: a rolling recent-label regime, which
 is what a deployed system would have (the previous months' confirmed incidents) but is not the
 paper's split. That is the configuration the PDP demo uses for its risk score, and it carries two
-caveats: it needs scenario labels, and it needs them recent. `models/userday/` currently holds
-the training-window models from the rerun; `scripts/userday.py --train-from-val` regenerates the
-recent-label ones.
+caveats: it needs scenario labels, and it needs them recent. `models/userday/` holds the
+recent-label models (`scripts/userday.py --train-from-val`: LR 0.954 / RF 0.911 on user-days,
+five seeds); the tables above come from the training-window run (`scripts/userday.py` with no
+flag), which is also what regenerates those models if you want the demo under the paper's
+protocol.
 
 Conclusion for the write-up: on CERT r4.2 replayed at event level, the paper's unsupervised
 design — reconstruction and isolation over a per-request behavioural vector — does not separate
