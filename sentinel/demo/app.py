@@ -63,7 +63,8 @@ def replay_day(art: Artefacts, sc: Scenario, day: str) -> None:
     top = top_features(art, x_day)
     x = ev[list(FEATURE_NAMES)].to_numpy(np.float32)
     sens = ev["resource_sensitivity"].to_numpy(np.float32)
-    scores = request_scores(art, x, ev["type"].to_numpy(), r_day, sens)
+    source = ss.get("risk_source", "rf")
+    scores = request_scores(art, x, ev["type"].to_numpy(), r_day, sens, source=source)
     for (i, e), (_, s) in zip(ev.iterrows(), scores.iterrows(), strict=True):
         rec = ss.trails.record(sc.principal, e, s["r"], s["R"], s["verdict"],
                                x[ev.index.get_loc(i)])
@@ -73,8 +74,8 @@ def replay_day(art: Artefacts, sc: Scenario, day: str) -> None:
                              "label": int(e["label"])})
     counts = scores["verdict"].value_counts().to_dict()
     ss.day_rows.append({"day": day, "events": len(ev), "malicious": int(ev["label"].sum()),
-                        "day risk (RF)": round(r_day, 3), **{k: counts.get(k, 0) for k in
-                                                                VERDICT_COLOUR}})
+                        "day risk (RF)": round(r_day, 3), "source": source,
+                        **{k: counts.get(k, 0) for k in VERDICT_COLOUR}})
     ss.last_top, ss.last_R = top, float(scores["R"].max()) if len(scores) else 0.0
     ss.last_verdict = scores["verdict"].iloc[int(scores["R"].idxmax())] if len(scores) else "ALLOW"
     ss.last_verify = ss.trails.verify(sc.principal) if ss.trails.committed else None
@@ -107,8 +108,20 @@ def main() -> None:
         st.sidebar.warning("SYNTHETIC scenario and models (fresh-clone bootstrap); run "
                            "`make demo-scenario` and `make train` on the CERT splits for the "
                            "real one.")
-    st.sidebar.caption("operating configuration: random forest on user-day vectors "
-                       "(SHAP top-3), propagated to each request as r′ = max(request r, day r)")
+    choice = st.sidebar.radio(
+        "risk source",
+        ["user-day RF — operating configuration",
+         "max(request hybrid r, day r) — paper's propagation"],
+        index=0, key="risk_source_choice")
+    ss.risk_source = "max" if choice.startswith("max") else "rf"
+    if ss.risk_source == "rf":
+        st.sidebar.caption("operating configuration: random forest on user-day vectors (SHAP "
+                           "top-3); every request of a day carries that day's r")
+    else:
+        st.sidebar.caption("paper's propagation r′ = max(request r, day r): the request-level "
+                           "hybrid is a benign quantile with 72 % FPR at R ≥ 0.85, so nearly "
+                           "every request is denied whatever the RF says — this is why it is "
+                           "not the operating configuration")
     tr = ss.trails
     st.sidebar.markdown(f"**ledger: {tr.backend}** · committed {tr.committed} · pending "
                        f"{tr.pending} · rejected {tr.rejected}")
@@ -145,7 +158,7 @@ def main() -> None:
         st.subheader("Sentinel")
         st.plotly_chart(gauge(ss.last_R, ss.last_verdict), use_container_width=True)
         if ss.last_top:
-            st.markdown("**top-3 contributing features (SHAP, user-day RF)**")
+            st.markdown("**top-3 risk-raising features (SHAP, user-day RF)**")
             for f in ss.last_top:
                 st.markdown(f"- `{f['feature']}` {f['direction']} risk "
                             f"(SHAP {f['shap']:+.3f}, value {f['value']:.2f})")

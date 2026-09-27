@@ -85,11 +85,16 @@ def test_scenario_replay_end_to_end():
     from sentinel.features.builder import FEATURE_NAMES
 
     x = ev[list(FEATURE_NAMES)].to_numpy(np.float32)
-    scores = request_scores(art, x, ev["type"].to_numpy(), day_risk(art, x_day),
-                            ev["resource_sensitivity"].to_numpy(np.float32))
+    r_day = day_risk(art, x_day)
+    sens = ev["resource_sensitivity"].to_numpy(np.float32)
+    scores = request_scores(art, x, ev["type"].to_numpy(), r_day, sens)
     assert len(scores) == len(ev)
     assert set(scores["verdict"]) <= {"ALLOW", "ALLOW_OBSERVE", "STEPUP", "DENY"}
-    assert (scores["r"] >= scores["r_request"]).all()            # propagation is a max
+    # operating configuration: every request of the day carries the RF's day r
+    assert np.allclose(scores["r"], r_day)
+    # the paper's propagation, kept for the demo's toggle, is a max
+    paper = request_scores(art, x, ev["type"].to_numpy(), r_day, sens, source="max")
+    assert (paper["r"] >= paper["r_request"]).all() and (paper["r"] >= r_day).all()
 
 
 def _shim_up() -> bool:

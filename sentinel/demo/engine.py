@@ -114,21 +114,31 @@ def day_risk(art: Artefacts, x_day: np.ndarray | None) -> float:
 
 
 def top_features(art: Artefacts, x_day: np.ndarray | None, k: int = 3) -> list[dict]:
-    """Top-k SHAP contributions of the day's vector to the RF's malicious probability."""
+    """Top-k SHAP contributions of the day's vector to the RF's malicious probability,
+    largest risk-raising first (signed, not absolute): the panel explains what pushed the
+    day up, which is what a step-up needs justifying with."""
     if art.explainer is None or x_day is None:
         return []
     xs = art.userday_engine.standardise(x_day[None, :]) if art.userday_engine else x_day[None, :]
     sv = art.explainer.shap_values(xs)
     vals = sv[1][0] if isinstance(sv, list) else (sv[0, :, 1] if sv.ndim == 3 else sv[0])
-    order = np.argsort(-np.abs(vals))[:k]
+    order = np.argsort(-vals)[:k]
     return [{"feature": art.feature_names[i], "shap": float(vals[i]), "value": float(x_day[i]),
              "direction": "raises" if vals[i] > 0 else "lowers"} for i in order]
 
 
 def request_scores(art: Artefacts, x: np.ndarray, types: np.ndarray, r_day: float,
-                   sensitivity: np.ndarray) -> pd.DataFrame:
+                   sensitivity: np.ndarray, source: str = "rf") -> pd.DataFrame:
+    """Risk per request. ``source="rf"`` (operating configuration): every request of the day
+    carries the user-day RF's r. ``source="max"``: the paper's propagation
+    r' = max(request hybrid r, day r) -- kept so the demo can show why it is not used: the
+    request-level hybrid is a benign quantile with 72 % FPR at R >= 0.85, so it denies nearly
+    everything regardless of the RF."""
     sc = art.request_engine.score(x, types=types)
-    r = np.maximum(sc.r, r_day)                       # propagation: max(request r, day r)
+    if source == "max":
+        r = np.maximum(sc.r, r_day)
+    else:
+        r = np.full(len(sc.r), r_day, dtype=np.float32)
     R = effective_risk(r, sensitivity, 0.0)
     verdict = [band_lookup(v).verdict for v in R]
     return pd.DataFrame({"r_request": sc.r, "r_day": r_day, "r": r, "R": R, "verdict": verdict})

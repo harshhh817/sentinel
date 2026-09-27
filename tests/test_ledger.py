@@ -195,3 +195,27 @@ def test_fabric_client_maps_422_to_ledger_rejected():
         assert v["intact"] and v["firstDiscontinuity"] == -1
     finally:
         srv.shutdown()
+
+
+def test_verifychain_never_reports_a_phantom_break_while_the_committer_is_running(pdp):
+    """The demo verifies after each replayed day while a background thread is still
+    committing. verify_chain must see the record and its head atomically."""
+    import threading
+
+    led = SimLedger(Verifier.from_signer(pdp))
+    recs = chain(pdp, "u1", 400)
+
+    def committer():
+        for r in recs:
+            led.commit(r)
+
+    t = threading.Thread(target=committer)
+    t.start()
+    phantom = []
+    while t.is_alive():
+        v = led.verify_chain("u1")
+        if not v["intact"]:
+            phantom.append(v["reason"])
+    t.join()
+    assert not phantom, phantom[:3]
+    assert led.verify_chain("u1")["intact"]

@@ -80,6 +80,12 @@ class SimLedger:
         return [dict(r) for r in self._records.values() if r.get("resource") == resource]
 
     def verify_chain(self, principal: str) -> dict[str, Any]:
+        # Under the commit lock: the committer writes the record and the head in one critical
+        # section, and a verify that lands between the two would report a phantom truncation.
+        with self._lock:
+            return self._verify_chain(principal)
+
+    def _verify_chain(self, principal: str) -> dict[str, Any]:
         recs = self.by_principal(principal)
         prev = GENESIS
         idx, reason = -1, ""
