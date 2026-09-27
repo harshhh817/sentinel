@@ -1,0 +1,13 @@
+{
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "evaluated_on": "test window, all user-days",
+  "test_userdays": 83986,
+  "test_positive": 240,
+  "models": "StandardScaler + LogisticRegression(balanced) / RandomForest(200, balanced)"
+}

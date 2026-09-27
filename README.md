@@ -47,8 +47,9 @@ Every number below is produced by a script; the paper's are from its Tables V–
 | Hybrid AUC, per-source models | — | 0.525 | Same; the autoencoder stays below 0.5 (malicious rows reconstruct slightly *better*). |
 | Isolation forest / autoencoder AUC | 0.897 / 0.941 | 0.774 / 0.680 | Same mechanism; the autoencoder is the weaker detector here, the reverse of the paper. |
 | Supervised RF AUC (event level) | 0.913 | 0.997 | The scenarios leave real, discriminative structure in the 34 features; it is not off-manifold. |
-| Unsupervised hybrid AUC, user-day | — | 0.800 (forest 0.791) | Aggregation is where the unsupervised signal lives; propagated to requests: 0.748 → 0.799. |
-| **Operating configuration** | hybrid | **RF on user-day vectors, AUC 0.954 (LR) / 0.911 (RF)** | The only configurations above 0.85; supervised, labelled from the validation window's first half (training window rerun pending the disk). |
+| Unsupervised hybrid AUC, user-day | — | 0.698 (forest 0.753) | Aggregation helps the forest (0.47–0.57 on events → 0.75) but not the hybrid; propagated to requests it is flat, 0.748 → 0.745. |
+| Supervised user-day AUC, paper's protocol | — | LR 0.729 / RF 0.518 | Labels only from the training window (572 positive user-days). Nothing reaches 0.85 under the paper's split. |
+| **Operating configuration** | hybrid | **supervised user-day LR/RF with *recent* labels: see `label_drift.csv`** | The same models trained on the two months before the test window clear 0.85; trained on the year before, they do not. The supervised user-day signal is non-stationary. |
 | Ablation: drop autoencoder / drop forest | −0.087 / −0.033 F1 | AUC 0.774 / 0.680 (vs 0.748) | Dropping the autoencoder *helps*; per-principal action frequency still beats global (0.748 vs 0.733). |
 | Injected gross anomalies (sanity) | — | hybrid AUC 0.997 (3 AM egress, 50× volume) | The pipeline detects off-manifold behaviour; the scripted scenarios are not off-manifold at event level. |
 | Added latency, median / p95 | 61.3 / 109.8 ms | 2.57 / 2.79 ms | In-process PDP with the model co-located; the paper's figure includes API Gateway → Lambda → SageMaker hops. |
@@ -319,31 +320,55 @@ are not off-manifold at event level in this feature space.
 
 **User-day granularity (`results/userday/`, `scripts/userday.py`).** Each (principal, day)
 becomes one 75-dim vector — log event count, after-hours fraction, per-feature mean and max, log
-counts of the rare flags — and the same autoencoder + forest is trained on benign user-days. With
-the training window on the unplugged disk, the validation window was split by day: its first half
-trains (19,522 user-days, 94 positive — labels used only by the supervised rows), its second half
-calibrates (16,741); the test window is untouched (83,986 user-days, 240 positive). Five seeds.
+counts of the rare flags — and the same autoencoder + forest is trained on the training window's
+benign user-days (211,590; the supervised rows add the 572 positive user-days of
+`train_malicious`), calibrated on the validation window (36,263) and evaluated on the untouched
+test window (83,986 user-days, 240 positive). Five seeds.
 
 | Model | user-day AUC | user-day F1 @ R≥0.85 | user-day tuned F1 |
 |---|---:|---:|---:|
-| Logistic regression † | **0.954** | 0.102 | 0.077 |
-| Random forest † | **0.911** | 0.105 | 0.119 |
-| Isolation forest | 0.791 | 0.013 | 0.002 |
-| Deep autoencoder | 0.545 | 0.006 | 0.008 |
-| Proposed hybrid | 0.800 | 0.006 | 0.005 |
+| Logistic regression † | 0.729 | 0.008 | 0.016 |
+| Random forest † | 0.518 | 0.000 | 0.023 |
+| Isolation forest | **0.753** | 0.012 | 0.002 |
+| Deep autoencoder | 0.552 | 0.006 | 0.006 |
+| Proposed hybrid | 0.698 | 0.009 | 0.009 |
 
 Propagated back to requests as r′ = max(request r, the principal's current-day r), on the same
-4 M-row test sample (`table_v_propagated.csv`): request-only AUC 0.748 →
-user-day-only 0.788 → propagated **0.799**. Aggregation is where the
-unsupervised signal lives: the forest reaches 0.79 on user-days against 0.47–0.57 on events, the
-autoencoder stays near chance, and the hybrid ends at 0.80 at both granularities.
+4 M-row test sample (`table_v_propagated.csv`): request-only AUC 0.748 → user-day-only 0.678 →
+propagated 0.745. Aggregation is where the forest's signal lives (0.47–0.57 on events → 0.75 on
+user-days), but the autoencoder stays at chance at both granularities and the fusion averages it
+back in, so the hybrid gains nothing.
 
-**Operating configuration.** Nothing unsupervised reaches AUC 0.85. The configurations that do are
-**supervised at user-day granularity**: logistic regression 0.954 and random forest
-0.911 on the 75-dim user-day vector. That is the configuration the PDP demo should
-use for its risk score, with the caveat that it is trained with scenario labels (from the
-validation window's first half here; from `train_malicious` once the training window is back)
-and therefore reflects the paper's supervised baselines rather than its unsupervised design.
+**Where the labels come from matters more than the model (`label_drift.csv`,
+`scripts/userday_label_drift.py`).** An earlier run of this table (`userday.py --train-from-val`,
+made while the training window sat on an unplugged disk) trained the supervised rows on the
+validation window's first half and reported LR 0.954 / RF 0.911. The rerun above, under the
+paper's protocol — labels only from the training window — gives 0.729 / 0.518. Neither principal
+overlap (2 % of the test insiders' user-days belong to principals the val-first-half labels had
+seen as positive) nor scenario type (all three label sets are ~90 % type-2 user-days) explains
+the gap. Time does — the same two models, trained on each label source and evaluated on the same
+test window, five seeds:
+
+| Labels from | user-days | positive | LR test AUC | RF test AUC |
+|---|---:|---:|---:|---:|
+| training window (train + train_malicious) | 211,590 | 572 | 0.736 ± 0.000 | 0.516 ± 0.010 |
+| validation window, first half by day | 19,522 | 94 | 0.954 ± 0.000 | 0.891 ± 0.008 |
+| training window + validation first half | 231,112 | 666 | 0.847 ± 0.000 | 0.904 ± 0.026 |
+| validation window, whole | 36,263 | 148 | 0.970 ± 0.000 | 0.924 ± 0.007 |
+
+Fewer labels from the two months before the test window beat six times as many from the year
+before. The supervised user-day signal is non-stationary: the features are baseline-relative
+(novelty, first-time flags, per-principal frequencies), and the scenarios' footprint in them
+drifts across the corpus.
+
+**Operating configuration.** Under the paper's protocol nothing — unsupervised or supervised —
+reaches AUC 0.85 at either granularity. A supervised user-day model does only when trained on
+labels from the months immediately before the test window: a rolling recent-label regime, which
+is what a deployed system would have (the previous months' confirmed incidents) but is not the
+paper's split. That is the configuration the PDP demo uses for its risk score, and it carries two
+caveats: it needs scenario labels, and it needs them recent. `models/userday/` currently holds
+the training-window models from the rerun; `scripts/userday.py --train-from-val` regenerates the
+recent-label ones.
 
 Conclusion for the write-up: on CERT r4.2 replayed at event level, the paper's unsupervised
 design — reconstruction and isolation over a per-request behavioural vector — does not separate

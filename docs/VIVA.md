@@ -28,18 +28,25 @@ splits reaches AUC 0.997, so the features carry the signal. And we found and fix
 on the way (a test overwrote the standardiser with synthetic statistics), then re-ran.
 
 **5. Why is the random forest the operating model? Isn't that abandoning the paper's idea?**
-It is the only configuration above AUC 0.85: 0.954 (LR) / 0.911 (RF) on user-day vectors. The
-paper itself lists these as supervised baselines. We kept the paper's architecture — trust
-algorithm, bands, credentials, evidence chain — and swapped the risk source, which the design
-allows: the PDP consumes r, it does not care how r was produced. The honest caveat: it needs
-scenario labels; an unsupervised detector would need session/day aggregates and content features
-the CERT→CloudTrail mapping discards.
+Because it is the only thing that clears AUC 0.85 — and only with *recent* labels. Under the
+paper's protocol (scenario labels from the training window only) the supervised user-day models
+reach LR 0.729 / RF 0.518, no better than the unsupervised forest at 0.753. Trained on labels from
+the two months immediately before the test window they clear 0.85 (`label_drift.csv`, five
+seeds). So the operating configuration is a supervised user-day model in a rolling recent-label
+regime — what a deployed system would have from the previous months' confirmed incidents, but
+not the paper's split, and we say so. The paper itself lists these models as supervised
+baselines. We kept the paper's architecture — trust algorithm, bands, credentials, evidence
+chain — and swapped the risk source, which the design allows: the PDP consumes r, it does not
+care how r was produced. Two honest caveats: it needs scenario labels, and it needs them recent,
+because the supervised signal in these baseline-relative features drifts across the year.
 
 **6. What is the user-day layer and why does it help?**
 One 75-dim vector per (principal, day): event count, after-hours fraction, per-feature mean and
 max, counts of rare flags. Most CERT work scores principal-days. The isolation forest goes from
-0.47 on events to 0.79 on user-days; propagated back as r′ = max(request r, day r) the request-level
-AUC moves 0.748 → 0.799. Aggregation is where the unsupervised signal lives.
+0.47 on events to 0.75 on user-days; propagated back as r′ = max(request r, day r) the
+request-level hybrid AUC is flat, 0.748 → 0.745, because the autoencoder is at chance at both
+granularities and the fusion averages it back in. Aggregation is where the forest's signal
+lives; on its own it is not enough for the hybrid.
 
 **7. What is wrong with equation (4) as printed?**
 `R = 1 − (1−r)^(1+λs)·(1−βc)` gives R = βc = 0.25 for a perfectly normal request under full
