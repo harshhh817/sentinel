@@ -34,8 +34,9 @@ from sentinel.risk.userday import USERDAY_FEATURES, aggregate
 
 _ROOT = ROOT
 DEMO_DIR = ROOT / "demo"
-VERDICT_COLOUR = {"ALLOW": "#2e7d32", "ALLOW_OBSERVE": "#f9a825", "STEPUP": "#ef6c00",
-                  "DENY": "#c62828"}
+# Verdicts are states: the fixed status palette (good / warning / serious / critical).
+VERDICT_COLOUR = {"ALLOW": "#0ca30c", "ALLOW_OBSERVE": "#fab219", "STEPUP": "#ec835a",
+                  "DENY": "#d03b3b"}
 
 
 # --- artefacts ---------------------------------------------------------------------

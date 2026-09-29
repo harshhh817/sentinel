@@ -161,8 +161,9 @@ class PDP:
         t.lap("inference")
 
         # 5-6. trust and band. A valid step-up response counts as a fresh hardware MFA.
-        if ctx.step_up_token and self.challenge_valid(ctx.step_up_token, req.principal,
-                                                      req.action, req.resource):
+        stepped_up = bool(ctx.step_up_token and self.challenge_valid(
+            ctx.step_up_token, req.principal, req.action, req.resource))
+        if stepped_up:
             ctx = ctx.model_copy(update={"mfa_age_seconds": 0.0, "mfa_hardware_backed": True,
                                          "device_managed": True})
         c = control_credit(ctx)
@@ -176,6 +177,13 @@ class PDP:
         if verdict in ("ALLOW", "ALLOW_OBSERVE"):
             cred = credentials.issue(self.settings, self.signer, req.principal, req.action,
                                      req.resource, band.scope, band.ttl_minutes)
+        elif verdict == "STEPUP" and stepped_up:
+            # Table III: a satisfied step-up earns the band's own credential (15 min,
+            # read-only). Without this a caller who already had full control credit could
+            # never leave the band: the token cannot lower R any further.
+            cred = credentials.issue(self.settings, self.signer, req.principal, req.action,
+                                     req.resource, band.scope, band.ttl_minutes)
+            reason += "; step-up satisfied"
         elif verdict == "STEPUP":
             challenge = self.issue_challenge(req.principal, req.action, req.resource)
             reason += "; present step_up_token after a fresh MFA"

@@ -400,8 +400,12 @@ curl -s localhost:8000/verify/CDE1846         # VerifyChain: first discontinuity
 credential (signed mock token locally; STS behind `SENTINEL_MODE=cloud`), the signed audit record of
 eq. (5), the risk breakdown and per-stage timings. Static entitlement (`sentinel/pdp/policies/*.json`,
 RBAC + ABAC, deny-by-default) is evaluated first and a static denial is final. A STEP-UP verdict
-returns a signed challenge; presenting it as `step_up_token` on the retry counts as a fresh
-hardware-backed MFA on a managed device.
+returns a signed challenge bound to the principal, action and resource; presenting it as
+`step_up_token` on the retry counts as a fresh hardware MFA on a managed device. If that
+moves R into an ALLOW band the caller gets that band's credential; if R stays in the STEP-UP
+band — a caller who already had full control credit — the challenge is satisfied and the
+caller gets the STEP-UP credential of Table III (15 minutes, read-only). A token never turns
+a DENY into a credential.
 
 **The compensating-control credit c comes from the request's auth context here** (managed device
 × MFA freshness over 8 h × hardware-backed bonus), which is what the CERT replay could not supply.
@@ -441,18 +445,32 @@ make demo               # streamlit run sentinel/demo/app.py
 Split screen over one CERT insider (`HBO0413`: 4,578 requests over 42 days, 229 scripted-malicious,
 removable-media + web), replayed day by day at an adjustable speed.
 
-- **Left, Plain IAM** — entitlement only: every request is ALLOW and the log is a mutable list.
-- **Right, Sentinel** — the operating configuration from the Progression section: the random
-  forest on the principal's user-day vector gives the day's risk (SHAP top-3 contributing features
-  shown), propagated to each request as r′ = max(request-level r, day r), through eq. (4) and
-  Table III into a live gauge and verdict colour; every request becomes a signed, hash-chained
-  record on the reference ledger with `VerifyChain` status.
-- **Cover tracks** — A3 deletes three suspicious records and rewrites three verdicts to ALLOW in
+The page reads top to bottom: six headline tiles (day, requests, scripted-malicious, allowed by
+IAM, held back by Sentinel, audit-chain status), two charts, the two systems side by side, the
+evidence panel and a day-by-day table that doubles as the charts' table view.
+
+- **Effective risk per day** — the day's peak R as a line against the Table III boundaries, with
+  the days the scenario scripts as malicious marked. **Requests held back per day** — what
+  Sentinel observed, stepped up or denied; quiet days stay empty.
+- **Plain IAM** — entitlement only: every request is allowed and the log is a mutable list.
+- **Sentinel** — the operating configuration from the Progression section: the random forest on
+  the principal's user-day vector gives the day's risk, carried by every request that day,
+  through eq. (4) and Table III to a verdict; the three features that raised the risk most
+  (signed SHAP) are listed. Every request becomes a signed, hash-chained record on the ledger.
+- **Risk source** (sidebar) — switches to the paper's propagation r′ = max(request-level r,
+  day r). The request-level hybrid is a benign quantile with 72 % FPR at R ≥ 0.85, so under it
+  nearly every request is denied, benign days included; the switch exists to show that.
+- **Cover tracks** — A3 deletes three suspicious records and rewrites three verdicts to Allow in
   *both* stores. The plain log just gets shorter; the ledger's `VerifyChain` reports the first
-  discontinuity and the broken link is highlighted.
+  discontinuity and the row where the chain breaks is marked.
+
+Verdicts are states, so they use one fixed status palette everywhere and never colour alone:
+each carries an icon and a label, the charts have legends and hover, and every plotted value is
+in the day-by-day table. `tests/test_dashboard.py` drives every control headless
+(Streamlit AppTest); `tests/test_charts.py` covers the chart builders.
 
 With the test-network and shim up the dashboard uses the **live Fabric ledger** (auto-detected;
-sidebar shows `ledger: fabric`, committed / pending / rejected): each request's record is signed,
+the sidebar names the ledger and shows committed / pending / rejected): each request's record is signed,
 chained and committed by an ordered background thread — the PDP's asynchronous committer — so the
 ledger lags the replay by the block cadence; "Cover tracks" then edits the endorsing peer's
 CouchDB directly and `VerifyChain` on that peer reports the break. Without the network it falls

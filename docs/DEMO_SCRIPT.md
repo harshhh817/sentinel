@@ -1,70 +1,81 @@
 # Five-minute demo runbook
 
 Before the room: `make demo-check` (all green), `make demo`, browser at http://localhost:8501,
-speed slider at 1 day/s. The scenario is CERT insider **HBO0413**: 4,578 requests over 42 days,
-229 scripted-malicious, removable media + web.
+replay speed at 1 day per second. The scenario is CERT insider **HBO0413**: 4,578 requests over
+42 days, 229 scripted as malicious, removable media + web.
+
+The page reads top to bottom: six headline tiles, two charts (effective risk per day; requests
+held back per day), the two systems side by side, the **Evidence** panel, and the **Day by day**
+table. All the controls are at the top of the sidebar.
 
 ## 0:00 — Frame it (no clicks)
 > "Same user, same 42 days, two systems. Left is what AWS IAM does today: entitlement only. Right
 > is Sentinel: every request scored against the user's own baseline, decision bound to a ledger."
 
-Point at the sidebar: `ledger: fabric · committed · pending`. "That's a live Hyperledger Fabric
-network on this laptop; the ledger lags the replay because each record waits for its block —
-commitment is off the decision path, as in the paper."
+Point at **Ledger** in the sidebar: "Hyperledger Fabric", with committed / pending / rejected.
+"That's a live Fabric network on this laptop; the ledger lags the replay because each record
+waits for its block — commitment is off the decision path, as in the paper."
 
-## 0:30 — Step one quiet day (click **step day**)
-Left: ~100 rows, all ALLOW. Right: gauge low, verdict green, counts mostly ALLOW.
+## 0:30 — Step one quiet day (click **Step day**)
+Tiles: ~100 requests, 0 held back, audit chain ✅ Intact. Left pane: every request 🟢 Allow.
+Right pane: peak verdict 🟢 Allow, the bullet near zero.
 > "Both systems agree on a normal day. Note the right side still writes a signed record per request."
 
-Point at **top-3 risk-raising features**: "SHAP on the user-day random forest — that's the
+Point at **What raised today's risk**: "SHAP on the user-day random forest — that's the
 operating model; the paper's unsupervised hybrid did not separate these scenarios, and the README
 says exactly why."
 
-## 1:15 — Press **▶ play**, let it run into the scenario window
-Watch the gauge climb on the heavy days — 14 March (24 malicious events) and 24 March (14) — and
-STEP-UP counts appear on the right while the left keeps saying ALLOW. Sentinel does not deny this
-user outright: the RF's day probability peaks at ~0.4, which the trust algorithm maps to STEP-UP.
+## 1:15 — Press **▶ Play**, let it run into the scenario window
+Watch the risk line climb on the heavy days — 14 March (24 malicious events) and 24 March (14);
+the orange dots are the days the scenario scripts as malicious. The **Held back** tile and the
+second chart fill in while **IAM allowed** keeps pace with every request. Sentinel does not deny
+this user outright: the forest's day probability peaks at ~0.4, which the trust algorithm maps
+to Step-up.
 > "Here's the insider copying to removable media and visiting job/leak sites. IAM allows every
 > one of these — the user is entitled. Sentinel steps up: read-only scope, 15-minute TTL, a
-> signed challenge. The day-by-day table is the RF's probability for each day."
+> signed challenge. The Day by day table has the forest's probability for each day."
 
-Pause (**⏸**) on an amber day. Read the top-3 risk-raising features aloud — on 14 March they are
-the cross-account flag (resources outside the user's own unit bucket), policy breadth and ARN
-prefix depth. "Those are the day-level
-signals; every request that day carries them."
+Press **⏸ Pause** on a day whose peak verdict is 🟠 Step-up. Read **What raised today's risk**
+aloud — on 14 March: the cross-account flag (resources outside the user's own unit bucket),
+policy breadth and ARN prefix depth. "Those are the day-level signals; every request that day
+carries them."
 
-Flip **risk source** to the paper's propagation and step one day: every request goes red.
+Switch **Risk source** to the paper's propagation and **Step day**: every request goes 🔴 Deny.
 > "That is the paper's design — max of the request-level hybrid and the day score. The
 > request-level hybrid is a benign quantile with a 72 % false-positive rate at R ≥ 0.85, so it
 > denies everything, benign or not. That is why it is not the operating model, and the README
-> shows the numbers." Flip it back.
+> shows the numbers." Switch it back.
 
 ## 2:30 — Show the evidence (no clicks)
-Point at "ledger (fabric): N committed records, VerifyChain → ✅ intact".
+Scroll to **Evidence**: "Ledger holds N records for this user. VerifyChain walked the chain from
+genesis: intact."
 > "Each record: per-user sequence number, hash of the previous record, a salted digest of the
 > feature vector, and a P-256 signature by the decision point. Chaincode rejects anything that
 > breaks that; there is no update or delete transaction."
 
 ## 3:00 — Press **🕵️ Cover tracks**
 > "Now I'm the privileged admin who wants this to go away. I delete three suspicious records and
-> rewrite three verdicts to ALLOW — in *both* stores. On the left the log just got shorter; nothing
+> rewrite three verdicts to Allow — in *both* stores. On the left the log just got shorter; nothing
 > to check against. On the right I edited the peer's CouchDB directly, behind the chaincode."
 
-Point at the red row: "VerifyChain re-walks the chain from genesis: first discontinuity at seq N —
-either the hash link is broken or the signature no longer verifies. 500 of 500 such attempts were
-caught in the experiment, zero false alarms on 10,000 clean records."
+The **Audit chain** tile turns ❌ Broken. Point at the row marked "chain breaks here":
+"VerifyChain re-walks the chain from genesis: first discontinuity at seq N — either the hash link
+is broken or the signature no longer verifies. 500 of 500 such attempts were caught in the
+experiment, zero false alarms on 10,000 clean records."
 
 ## 4:00 — Land it
 > "Three takeaways. One: entitlement can't see intent; the operating model can, at AUC 0.95 on
-> user-days with recent labels. Two: the decision *and its evidence* are on a ledger the admin can't quietly edit.
-> Three: we report where the paper's numbers didn't hold and why — the unsupervised hybrid, the
-> operating threshold, and a sign error in equation (4) — and every number here is regenerated by
-> a script."
+> user-days with recent labels. Two: the decision *and its evidence* are on a ledger the admin
+> can't quietly edit. Three: we report where the paper's numbers didn't hold and why — the
+> unsupervised hybrid, the operating threshold, and a sign error in equation (4) — and every
+> number here is regenerated by a script."
 
 ## If something breaks
-- Sidebar shows `ledger: sim` — the shim or network is down; the demo still works on the reference
-  ledger. Say so; the mechanics are identical.
-- Cover tracks greyed out — fewer than 6 records committed yet; step one more day or wait ~15 s.
-- `rejected > 0` in the sidebar — restart the demo (**reset**); chains are per session.
+- Sidebar says **Ledger · reference ledger (sim)** — the shim or network is down; the demo still
+  works on the reference ledger. Say so; the mechanics are identical.
+- Cover tracks greyed out — fewer than 6 records committed yet (step one more day, or on Fabric
+  wait ~15 s), or it has already been pressed this session: **Reset**.
+- `rejected` above 0 in the sidebar — **Reset**; chains are per session.
+- Want to jump ahead — **Skip 5 days**.
 - Recovery commands: `make demo-check`; shim: `cd sentinel/ledger/shim && node server.js`; network:
   `chaincode/README.md`.

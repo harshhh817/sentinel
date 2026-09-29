@@ -134,6 +134,38 @@ def test_stepup_path_challenge_then_retry_succeeds(tmp_path, models):
         assert forged["verdict"] == "STEPUP"
 
 
+def test_satisfied_stepup_with_full_credit_already_gets_the_band_credential(tmp_path, models):
+    # Full credit from the start (managed device, fresh hardware MFA): R = 0.75 * [1-(1-r)^1.9].
+    # r = 0.99 -> R = 0.750 -> STEPUP, and the token cannot lower it: before the fix the PDP
+    # answered every retry with another challenge.
+    with make_client(tmp_path, models, r=0.99) as c:
+        first = c.post("/authorize", json=req()).json()
+        assert first["verdict"] == "STEPUP" and first["risk"]["credit"] > 0.99
+        assert first["credential"] is None and first["challenge"]
+        retry = c.post("/authorize", json=req(step_up_token=first["challenge"])).json()
+        assert retry["verdict"] == "STEPUP" and retry["challenge"] is None
+        assert retry["credential"] and retry["credential"]["ttl_minutes"] == 15
+        assert retry["credential"]["scope"] == retry["scope"] == "read_only"
+        assert "step-up satisfied" in retry["reason"]
+        # forged, and a genuine token replayed against another resource: challenged again
+        forged = c.post("/authorize",
+                        json=req(step_up_token=first["challenge"][:-4] + "AAAA")).json()
+        assert forged["credential"] is None and forged["challenge"]
+        other = c.post("/authorize", json=req(resource="arn:aws:s3:::sentinel-sales/other.pdf",
+                                              step_up_token=first["challenge"])).json()
+        assert other["credential"] is None and other["challenge"]
+
+
+def test_a_stepup_token_never_rescues_a_deny(tmp_path, models):
+    with make_client(tmp_path, models, r=0.5) as c:
+        token = c.post("/authorize", json=req(device_managed=False,
+                                              mfa_age_seconds=None)).json()["challenge"]
+    with make_client(tmp_path, models, r=0.9999) as c:
+        body = c.post("/authorize", json=req(
+            resource="arn:aws:s3:::sentinel-sales/removable/PC-1", step_up_token=token)).json()
+        assert body["verdict"] in ("DENY", "STEPUP") and body["credential"] is None
+
+
 def test_deny_path_no_credential_no_baseline_update_but_record_written(tmp_path, models):
     with make_client(tmp_path, models, r=0.99) as c:
         body = c.post("/authorize", json=req(device_managed=False, mfa_age_seconds=None)).json()
