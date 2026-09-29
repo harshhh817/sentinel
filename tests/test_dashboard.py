@@ -94,3 +94,15 @@ def test_play_runs_to_the_end_and_stops(app):
     app.button(key="btn_play").click().run()
     assert not app.exception
     assert app.session_state.day_idx >= 6
+
+
+def test_chain_status_follows_the_ledger_not_the_moment_of_replay(app):
+    """On Fabric the ledger commits after the day is drawn. Simulate that: a stale status
+    from before anything was committed must be replaced on the next render."""
+    app.button(key="btn_step").click().run()
+    app.session_state["last_verify"] = None
+    app.session_state["verified_at"] = -1
+    app.run()
+    assert not app.exception and tile(app, "Audit chain") == "✅ Intact"
+    assert app.session_state.verified_at == app.session_state.trails.committed
+    assert any("VerifyChain walked the chain" in s.value for s in app.success)

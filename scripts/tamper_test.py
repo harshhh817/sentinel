@@ -141,7 +141,10 @@ def run(ledger_kind: str, n_attempts: int, control: int, seed: int, shim_url: st
             ledger.set_pdp_public_key(pdp.public_pem().decode())
         except Exception as e:  # noqa: BLE001
             if "already set" not in str(e) or not keys_dir:
-                raise SystemExit(f"cannot install the PDP key on the ledger: {e}") from e
+                raise SystemExit(
+                    f"cannot install the PDP key on the ledger: {e} "
+                    "(the channel accepts one key, set once; pass --keys-dir state/keys "
+                    "to reuse the persisted one)") from e
     else:
         raise SystemExit(f"unknown ledger {ledger_kind}")
     log = JsonlLog()

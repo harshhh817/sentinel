@@ -137,7 +137,10 @@ def main(argv: list[str] | None = None) -> int:
             ledger.set_pdp_public_key(pdp.public_pem().decode())
         except Exception as e:  # noqa: BLE001
             if "already set" not in str(e) or not a.keys_dir:
-                raise SystemExit(f"cannot install the PDP key: {e}") from e
+                raise SystemExit(
+                    f"cannot install the PDP key: {e} "
+                    "(the channel accepts one key, set once; pass --keys-dir state/keys "
+                    "to reuse the persisted one)") from e
     rows = []
     for i, rate in enumerate(a.rates):
         principals = Principals(pdp, a.principals, offset=i * a.principals)

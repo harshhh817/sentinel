@@ -45,6 +45,7 @@ st.set_page_config(page_title="Sentinel demo", layout="wide", page_icon="🛡️
 SOURCES = {"rf": "User-day RF — operating configuration",
            "max": "max(request hybrid r, day r) — paper's propagation"}
 MIN_TAMPER = 6
+REFRESH_SECONDS = 2.0
 CSS = """
 <style>
 .block-container {padding-top: 2.2rem; padding-bottom: 3rem; max-width: 1500px;}
@@ -56,6 +57,11 @@ h1 {font-size: 1.7rem !important; margin-bottom: 0 !important;}
 /* columns in the page body wrap instead of squeezing their contents into ellipses */
 section.main [data-testid="stHorizontalBlock"] {flex-wrap: wrap;}
 section.main [data-testid="column"] {min-width: 132px;}
+/* the two systems stack rather than share a width too narrow for their tables */
+section.main [data-testid="column"]:has([data-testid="stVerticalBlockBorderWrapper"]) {
+  min-width: 340px;}
+/* the page re-renders while the ledger commits and during play: no fade on each pass */
+[data-stale="true"] {opacity: 1 !important; transition: none !important;}
 </style>
 """
 
@@ -84,6 +90,18 @@ def init_state(sc: Scenario) -> None:
         ss.last_R = 0.0
         ss.last_verdict = "ALLOW"
         ss.cover_actions = None
+        ss.verified_at = -1        # committed count when VerifyChain last ran
+
+
+def refresh_verify(sc: Scenario) -> None:
+    """Re-run VerifyChain whenever the ledger has moved on since the last run. On Fabric the
+    committer lags the replay, so the status from the moment a day was replayed is stale by
+    the time anyone reads it."""
+    ss = st.session_state
+    tr = ss.trails
+    if tr.committed and tr.committed != ss.get("verified_at"):
+        ss.last_verify = tr.verify(sc.principal)
+        ss.verified_at = tr.committed
 
 
 def current_source() -> str:
@@ -119,7 +137,7 @@ def replay_day(art: Artefacts, sc: Scenario, day: str, source: str) -> None:
                         "day risk r": round(r_day, 3), "peak R": round(ss.last_R, 3),
                         "source": source, **{v: int(counts.get(v, 0)) for v in VERDICT_COLOUR}})
     settle(ss.trails)
-    ss.last_verify = ss.trails.verify(sc.principal) if ss.trails.committed else None
+    refresh_verify(sc)
 
 
 # --- actions (callbacks run before the page is drawn) -----------------------------------
@@ -148,7 +166,8 @@ def on_cover() -> None:
     sc = scenario(None)
     settle(ss.trails)
     ss.cover_actions = ss.trails.cover_tracks(sc.principal)
-    ss.last_verify = ss.trails.verify(sc.principal) if ss.trails.committed else None
+    ss.verified_at = -1                     # the stores changed under the same count
+    refresh_verify(sc)
 
 
 # --- page sections ----------------------------------------------------------------------
@@ -384,6 +403,7 @@ def main() -> None:
     sc = scenario(None)
     init_state(sc)
     ss = st.session_state
+    refresh_verify(sc)
     speed = sidebar(sc)
 
     st.title("Plain IAM vs Sentinel")
@@ -415,6 +435,10 @@ def main() -> None:
         st.rerun()
     elif ss.playing:
         ss.playing = False
+        st.rerun()
+    elif ss.trails.pending:
+        # Fabric is still committing: keep the counters and the chain status moving
+        time.sleep(REFRESH_SECONDS)
         st.rerun()
 
 

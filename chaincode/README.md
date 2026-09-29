@@ -24,6 +24,23 @@ cd ~ && curl -sSL https://raw.githubusercontent.com/hyperledger/fabric/main/scri
   | bash -s -- --fabric-version 2.5.9 docker samples binary
 ```
 
+If the installer is not on the machine, the images can be pulled directly. The compose files
+ask for `latest`, so tag the versions that match the binaries in `fabric-samples/bin`
+(`peer version`, `fabric-ca-client version`):
+
+```bash
+docker pull hyperledger/fabric-peer:2.5.9    && docker tag hyperledger/fabric-peer:2.5.9    hyperledger/fabric-peer:latest
+docker pull hyperledger/fabric-orderer:2.5.9 && docker tag hyperledger/fabric-orderer:2.5.9 hyperledger/fabric-orderer:latest
+docker pull hyperledger/fabric-ca:1.5.17     && docker tag hyperledger/fabric-ca:1.5.17     hyperledger/fabric-ca:latest
+docker pull couchdb:3.4.2                    # the tag compose/compose-couch.yaml names
+docker pull golang:1.22-alpine && docker pull alpine:3.20      # bases of the chaincode image
+```
+
+About 1.5 GB in total. The channel accepts one PDP public key, set once: every script that
+writes to the same network must reuse it (`--keys-dir state/keys`), and the tamper experiment
+needs the peer's CouchDB address (`--couchdb http://admin:adminpw@localhost:5984/mychannel_auditcontract`,
+the test-network's development credentials).
+
 ## Bring up a 2-org network with CouchDB and deploy
 
 The chaincode is deployed **as a service** (CCaaS): the image is built on the host from the
